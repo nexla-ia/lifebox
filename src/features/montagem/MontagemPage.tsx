@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { apenasDigitos } from '../../lib/numero'
 import { formatarTelefone } from '../../lib/telefone'
 import { useQuery } from '../../lib/useQuery'
 import { EmptyState, ErrorState, Loading } from '../../ui/states'
@@ -252,7 +253,8 @@ function Linha({
               aria-label={`Bags de ${p.cliente}`}
               value={bags}
               disabled={salvandoBags}
-              onChange={(e) => setBags(e.target.value)}
+              inputMode="numeric"
+              onChange={(e) => setBags(apenasDigitos(e.target.value))}
               onBlur={salvarBags}
               onKeyDown={(e) => { if (e.key === 'Enter') void salvarBags() }}
               className={`w-10 text-center border rounded-md py-0.5 outline-none tnum font-bold ${

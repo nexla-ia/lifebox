@@ -25,7 +25,7 @@ test.describe('ZIP codes', () => {
   // hook em vez de finally: timeout de teste aborta o corpo antes do finally
   test.afterAll(() => limparZips(paraLimpar))
 
-  test('lista vazia avisa que o link público recusa tudo', async ({ page }) => {
+  test('a lista explica o que a falta de ZIP faz com o link público', async ({ page }) => {
     await page.goto('/')
     await page.getByLabel('E-mail').fill(email!)
     await page.getByLabel('Senha').fill(senha!)
@@ -35,8 +35,18 @@ test.describe('ZIP codes', () => {
     // a aba inicial passou a ser o Link público, que é o que a equipe mais abre
     await page.getByRole('button', { name: 'ZIP Codes', exact: true }).click()
 
-    await expect(page.getByText('Nenhum ZIP cadastrado')).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByText(/recusa todo pedido por estar fora da área/)).toBeVisible()
+    const lista = page.locator('section').filter({ hasText: 'ZIP codes atendidos' })
+    await expect(lista).toBeVisible({ timeout: 15_000 })
+
+    // O banco é o da cliente: ela já pode ter cadastrado as cidades dela, e
+    // esvaziar a tabela para forçar o estado vazio seria apagar dado real.
+    // Então o teste confere o estado que EXISTE, sem criar nem apagar nada.
+    if (await page.getByText('Nenhum ZIP cadastrado').isVisible()) {
+      await expect(page.getByText(/recusa todo pedido por estar fora da área/)).toBeVisible()
+    } else {
+      await expect(lista.getByText(/ZIP codes atendidos · [1-9]/)).toBeVisible()
+      await expect(page.getByText('Nenhum ZIP cadastrado')).toHaveCount(0)
+    }
   })
 
   test('importa todos os ZIPs de uma cidade de uma vez', async ({ page }) => {
@@ -64,7 +74,11 @@ test.describe('ZIP codes', () => {
       await expect(lista.getByText(new RegExp(`ZIP codes atendidos · [1-9]`))).toBeVisible({ timeout: 15_000 })
       await expect(lista.getByText(CIDADE).first()).toBeVisible()
 
-      const importados = await lista.locator('li strong').allInnerTexts()
+      // SÓ os ZIPs da cidade importada. Varrer a lista inteira faria o afterAll
+      // apagar os ZIPs que a LifeBox já tinha cadastrado — o teste destruiria
+      // dado real da cliente para limpar o próprio rastro.
+      const importados = await lista.locator('li')
+        .filter({ hasText: CIDADE }).locator('strong').allInnerTexts()
       paraLimpar.push(...importados)
       expect(importados.length).toBeGreaterThan(0)
 

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { apenasDecimal, apenasDigitos } from '../../lib/numero'
 import { money } from '../../lib/supabase'
 import { finalPriceCents, moneyInput, parseMoney } from '../../lib/precos'
 import type { ExtraKind, Plan, Size } from '../../lib/types'
@@ -319,7 +320,8 @@ function CelulaValor({
           autoFocus
           aria-label={rotulo ?? 'valor'}
           value={texto}
-          onChange={(e) => { setTexto(e.target.value); setErro(false) }}
+          inputMode="decimal"
+          onChange={(e) => { setTexto(apenasDecimal(e.target.value)); setErro(false) }}
           onBlur={salvar}
           onKeyDown={(e) => {
             if (e.key === 'Enter') salvar()
@@ -426,7 +428,7 @@ function FormPlano({ onCancelar, onSalvo }: { onCancelar: () => void; onSalvo: (
         <label className="block">
           <span className="text-[11px] font-semibold text-ink-2">Refeições no plano *</span>
           <input className={`${campo} tnum`} value={refeicoes} inputMode="numeric"
-                 onChange={(e) => setRefeicoes(e.target.value)} placeholder="10" />
+                 onChange={(e) => setRefeicoes(apenasDigitos(e.target.value))} placeholder="10" />
           <span className="text-[10.5px] text-ink-muted">
             É o limite: o que passar disso vira extra, cobrado pelo unitário da faixa.
           </span>
@@ -434,7 +436,7 @@ function FormPlano({ onCancelar, onSalvo }: { onCancelar: () => void; onSalvo: (
         <label className="block">
           <span className="text-[11px] font-semibold text-ink-2">Breakfasts no plano</span>
           <input className={`${campo} tnum`} value={breakfasts} inputMode="numeric"
-                 onChange={(e) => setBreakfasts(e.target.value)} placeholder="5" />
+                 onChange={(e) => setBreakfasts(apenasDigitos(e.target.value))} placeholder="5" />
         </label>
       </div>
 

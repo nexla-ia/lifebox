@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { formatarTelefone, normalizarTelefone } from '../../lib/telefone'
+import { apenasDigitos } from '../../lib/numero'
 import { normalizarZip } from '../../lib/zip'
 import {
   consultarZipAtendido, identificar, type CatalogoLink, type Identificacao,
@@ -188,7 +189,10 @@ export function PassoIdentificacao({
               <div className="grid grid-cols-2 gap-3">
                 <Campo label={t.zip} obrigatorio>
                   <input value={dados.zip_code} inputMode="numeric" autoComplete="postal-code"
-                    onChange={(e) => setDados({ ...dados, zip_code: e.target.value })}
+                    maxLength={5}
+                    onChange={(e) => setDados({
+                      ...dados, zip_code: apenasDigitos(e.target.value),
+                    })}
                     onBlur={(e) => void conferirZip(e.target.value)}
                     placeholder="02151" className={inputCls} />
                 </Campo>

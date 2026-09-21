@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { apenasDigitos } from '../../lib/numero'
 import type { Dish, DishCategory } from '../../lib/types'
 import { enviarFoto, salvarPrato, type DadosMenus } from './menusApi'
 
@@ -203,7 +204,7 @@ export function FormPrato({ dados, prato, menuId, menuNome, onCancelar, onSalvo 
                 inputMode="numeric"
                 className={`${campo} tnum`}
                 value={v}
-                onChange={(e) => set(e.target.value)}
+                onChange={(e) => set(apenasDigitos(e.target.value))}
               />
             </label>
           ))}

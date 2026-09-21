@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { apenasDecimal } from '../../lib/numero'
 import { money } from '../../lib/supabase'
 import { useQuery } from '../../lib/useQuery'
 import { EmptyState, ErrorState, Loading } from '../../ui/states'
@@ -367,14 +368,14 @@ function EditarMeta({
         <div className="flex items-center gap-1.5">
           <span className="text-[13px] text-ink-3">$</span>
           <input value={texto} inputMode="decimal" aria-label="Meta do período"
-            onChange={(e) => { setTexto(e.target.value); setAviso(null) }}
+            onChange={(e) => { setTexto(apenasDecimal(e.target.value)); setAviso(null) }}
             className="w-32 border border-line-strong rounded-lg px-3 py-2 text-[13px] bg-surface-alt outline-none focus:border-brand tnum" />
         </div>
       </label>
 
       <button disabled={salvando}
         onClick={async () => {
-          const n = Math.round(Number(texto.replace(',', '.')) * 100)
+          const n = Math.round(Number(texto) * 100)
           if (!Number.isFinite(n) || n < 0) { setAviso('Valor inválido.'); return }
           setSalvando(true); setAviso(null)
           const { error } = await salvarMeta(tipo, chave, n)

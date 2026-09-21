@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { apenasDigitos } from '../../lib/numero'
 import { useAuth } from '../../lib/auth'
 import { useQuery } from '../../lib/useQuery'
 import { EmptyState, ErrorState, Loading } from '../../ui/states'
@@ -130,7 +131,8 @@ function ItemColeta({
       {devolvendo ? (
         <div className="flex gap-1.5 items-center">
           <input aria-label={`Bags devolvidas por ${c.first_name}`} value={qtd}
-            onChange={(e) => setQtd(e.target.value)}
+            inputMode="numeric"
+            onChange={(e) => setQtd(apenasDigitos(e.target.value))}
             className="w-14 text-center border border-line-strong rounded-md py-1 bg-surface-alt outline-none focus:border-brand tnum" />
           <button onClick={async () => {
             const n = Number(qtd)
@@ -179,7 +181,8 @@ function CardEstoque({
       {editando ? (
         <div className="flex gap-1.5 mt-1">
           <input aria-label="Estoque total de bags" value={texto}
-            onChange={(e) => setTexto(e.target.value)}
+            inputMode="numeric"
+            onChange={(e) => setTexto(apenasDigitos(e.target.value))}
             className="w-20 border border-line-strong rounded-md px-2 py-1 text-[17px] font-bold bg-surface-alt outline-none focus:border-brand tnum" />
           <button onClick={async () => {
             const n = Number(texto)

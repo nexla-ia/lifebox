@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { money } from '../../lib/supabase'
+import { apenasDecimal, apenasDigitos } from '../../lib/numero'
 import { moneyInput, parseMoney } from '../../lib/precos'
 import type { Addon, AddonCategory, AddonVariant } from '../../lib/types'
 import { fetchAddons, saveAddon, setAddonActive } from './api'
@@ -199,8 +200,8 @@ function FormAdicional({
       <div className="grid grid-cols-3 gap-3">
         <label className="block">
           <span className="text-[11px] font-semibold text-ink-2">Preço *</span>
-          <input className={`${campo} tnum`} value={preco} placeholder="29.90"
-            onChange={(e) => setPreco(e.target.value)} />
+          <input className={`${campo} tnum`} value={preco} placeholder="29.90" inputMode="decimal"
+            onChange={(e) => setPreco(apenasDecimal(e.target.value))} />
         </label>
         <label className="block">
           <span className="text-[11px] font-semibold text-ink-2">Categoria</span>
@@ -211,8 +212,11 @@ function FormAdicional({
         </label>
         <label className="block">
           <span className="text-[11px] font-semibold text-ink-2">Refeições do menu inclusas</span>
-          <input type="number" min={0} className={`${campo} tnum`} value={f.includes_meals_qty ?? 0}
-            onChange={(e) => setF({ ...f, includes_meals_qty: Number(e.target.value) })} />
+          <input className={`${campo} tnum`} inputMode="numeric"
+            value={String(f.includes_meals_qty ?? 0)}
+            onChange={(e) => setF({
+              ...f, includes_meals_qty: Number(apenasDigitos(e.target.value) || 0),
+            })} />
           <span className="text-[10.5px] text-ink-muted">
             Acima de 0, o cliente escolhe esses pratos e eles entram na folha da cozinha.
           </span>

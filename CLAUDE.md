@@ -39,6 +39,11 @@ Corolários:
 - Semana ISO começando na segunda: `2026-W38`, exibida como `W38`.
 - Telefone em **E.164** (`+15085550164`) — é a chave de cruzamento com o WhatsApp.
 - Arredondamento do tax: half-up para 2 casas (`round()` do Postgres sobre centavos).
+- **Campo numérico filtra na digitação**, por `apenasDigitos`/`apenasDecimal`
+  (`src/lib/numero.ts`). `inputMode="numeric"` só escolhe o teclado do celular:
+  no computador a letra entra igual e só aparece o erro no "Salvar", quando a
+  pessoa já esqueceu o que digitou. `type="number"` traz as setinhas, o scroll
+  que muda o valor sem querer e vírgula dependente do idioma do navegador.
 - **`§` é marcador de código, nunca de tela.** Serve para achar a regra no
   documento-mestre; a equipe da LifeBox não tem esse documento, e "(§5.4)" numa
   nota de rodapé só some com a frase que explica a regra. Em texto visível,
@@ -98,6 +103,13 @@ exportar `E2E_EMAIL` faz os testes **pularem em silêncio** e a saída fica
 verde. Pelo mesmo motivo, `scripts/db.sh test` aborta com exit 1 se não
 conseguir conectar — runner que reporta "0 falhas" sem ter rodado é o pior
 resultado possível.
+
+**O banco do e2e é o da cliente, e ela já usa o sistema.** Teste não pode supor
+lista vazia nem varrer a tela para montar a limpeza: `zips.spec.ts` recolhia
+todos os ZIPs visíveis para apagar no fim e teria apagado os que a LifeBox
+cadastrou. Limpe pelo que o teste CRIOU, filtrando pela marca; e quando o
+estado a conferir depende de a tabela estar vazia, confira o estado que existe
+em vez de esvaziar.
 
 Os testes que gravam no Supabase limpam em **hook `afterAll`**, nunca em
 `try/finally`: quando um teste estoura o timeout o Playwright aborta o corpo e
