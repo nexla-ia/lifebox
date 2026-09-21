@@ -78,3 +78,54 @@ insert into allergens (code, label_pt, label_en, icon) values
 -- pela LifeBox na tela Catálogo > Menus do ciclo.
 insert into menus (name, cycle_position) values
   ('Menu 1', 1), ('Menu 2', 2), ('Menu 3', 3), ('Menu 4', 4);
+
+-- --------------------------------------------------------- message_templates
+-- Mensagem de confirmação do WhatsApp (§9.2, tela 6p). Vai no seed BASE porque
+-- sem template a automação não tem o que enviar — e o texto é editável na tela
+-- de Configurações, como todo o resto.
+--
+-- As variáveis entre chaves são substituídas pelo n8n na hora do envio. Nada
+-- de valor monetário aqui: {total} vem do pedido, {instrucoes_pagamento} e
+-- {link_pagamento} vêm da forma de pagamento cadastrada.
+insert into message_templates (key, language, body) values
+  ('order_confirmation', 'pt',
+'Olá, {nome}!
+
+✅ Recebemos seu pedido {numero_pedido} da {semana}.
+
+📦 {plano} · {tamanho}
+🍽️ {lista_pratos}
+➕ {adicionais}
+
+💵 {total} · {forma_pagamento} · {status_pagamento}
+
+🔑 Como pagar
+{instrucoes_pagamento}
+{link_pagamento}
+
+📸 Depois de pagar, envie o comprovante aqui nesta conversa.
+
+🚚 {data_entrega}
+
+Qualquer ajuste, responda aqui. 💚'),
+  ('order_confirmation', 'en',
+'Hi, {nome}!
+
+✅ We received your order {numero_pedido} for {semana}.
+
+📦 {plano} · {tamanho}
+🍽️ {lista_pratos}
+➕ {adicionais}
+
+💵 {total} · {forma_pagamento} · {status_pagamento}
+
+🔑 How to pay
+{instrucoes_pagamento}
+{link_pagamento}
+
+📸 Once you pay, send the receipt here in this chat.
+
+🚚 {data_entrega}
+
+Any changes, just reply here. 💚')
+on conflict (key, language) do nothing;

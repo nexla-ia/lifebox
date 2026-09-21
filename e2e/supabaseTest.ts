@@ -295,3 +295,46 @@ export async function criarAdicionalTeste(marca: string, precoCents: number) {
   const [a] = r ? ((await r.json()) as { id: string }[]) : []
   return a?.id ?? null
 }
+
+// ------------------------------------------------------- Configurações (9.8)
+/** Cutoff e template são configuração GLOBAL, sem dono: o teste guarda o que
+ *  estava lá e devolve no afterAll. Deixar o cutoff em segunda 08:00 fecharia
+ *  o link público da cliente na vida real. */
+export async function lerCutoff() {
+  const r = await rest('settings?select=key,value&key=in.(cutoff_weekday,cutoff_time)')
+  const linhas = r ? ((await r.json()) as { key: string; value: unknown }[]) : []
+  const m = new Map(linhas.map((l) => [l.key, l.value]))
+  return { weekday: Number(m.get('cutoff_weekday') ?? 4), hora: String(m.get('cutoff_time') ?? '18:00') }
+}
+
+export async function setCutoff(weekday: number, hora: string) {
+  const c = await conectar()
+  if (!c) return
+  await fetch(`${c.url}/rest/v1/rpc/fn_salvar_cutoff`, {
+    method: 'POST',
+    headers: { apikey: c.key, Authorization: `Bearer ${c.token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_weekday: weekday, p_hora: hora }),
+  })
+}
+
+export async function lerTemplate(key: string, lang: 'pt' | 'en') {
+  const r = await rest(`message_templates?select=body&key=eq.${key}&language=eq.${lang}`)
+  const [t] = r ? ((await r.json()) as { body: string }[]) : []
+  return t?.body ?? ''
+}
+
+export async function setTemplate(key: string, lang: 'pt' | 'en', body: string) {
+  await rest(`message_templates?key=eq.${key}&language=eq.${lang}`, {
+    method: 'PATCH', body: JSON.stringify({ body }), headers: { Prefer: 'return=minimal' },
+  })
+}
+
+export async function limparOrigens(marca: string) {
+  await rest(`sources?name=like.${encodeURIComponent(`%${marca}%`)}`,
+             { method: 'DELETE', headers: { Prefer: 'return=minimal' } })
+}
+
+export async function limparFormas(marca: string) {
+  await rest(`payment_methods?name_pt=like.${encodeURIComponent(`%${marca}%`)}`,
+             { method: 'DELETE', headers: { Prefer: 'return=minimal' } })
+}

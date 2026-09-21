@@ -184,6 +184,29 @@ Valores sem rótulo visível (Faturado, A receber) levam `aria-label` — melhor
 leitor de tela e evita que o teste tenha que caçar o rótulo pela estrutura do
 DOM.
 
+## Configurações (§9.8)
+
+É aqui que o princípio do projeto se paga: ZIP, origem, cutoff, forma de
+pagamento e mensagem são cadastro da LifeBox, editáveis em tela.
+
+**Cutoff vai por `fn_salvar_cutoff`, não por update na tabela.** `weeks.cutoff_at`
+é gravado na criação da semana, então mudar só `settings` não mexeria na semana
+em andamento — a equipe salvaria quarta 16h e o link continuaria fechando quinta
+18h, sem erro. A função realinha as semanas que ainda não terminaram e deixa as
+fechadas intactas.
+
+**RLS barra UPDATE devolvendo zero linhas, sem erro.** Toda ação de tela que
+depende de papel precisa de guard explícito no servidor, senão a Operação
+"salva" e nada muda. `fn_salvar_cutoff` levanta `LB403`.
+
+`recipient_keys` da forma de pagamento é a lista contra a qual a conferência do
+comprovante checa o destinatário (§9.3): chave faltando manda o comprovante
+para a fila manual.
+
+Template de mensagem **não faz reload depois de salvar**: `useQuery.reload`
+volta a `loading` e a aba inteira vira skeleton — num formulário, o texto some,
+o cursor se perde e a confirmação nem aparece.
+
 ## Link público (§9.7)
 
 A única rota sem login: `/pedido`, fora do `AppLayout` e sem guarda. Quem chega

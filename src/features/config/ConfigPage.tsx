@@ -1,10 +1,18 @@
 import { useState } from 'react'
 import { useAuth } from '../../lib/auth'
+import { Cutoff } from './Cutoff'
+import { FormasPagamento } from './FormasPagamento'
+import { Mensagens } from './Mensagens'
+import { Origens } from './Origens'
 import { ZipCodes } from './ZipCodes'
 
 /* Tela 9.8 · Configurações. Ref: protótipo 9d. Exclusiva do Administrador (§3).
- * As demais abas entram nas próximas etapas; ZIPs vem primeiro porque sem a
- * lista o link público recusa todo pedido. */
+ *
+ * É aqui que o princípio do projeto se paga: ZIP, origem, cutoff, forma de
+ * pagamento e mensagem são cadastro da LifeBox, editáveis em tela. Nenhum
+ * deles pode virar constante no código.
+ *
+ * ZIPs vêm primeiro porque sem a lista o link público recusa todo pedido. */
 
 const ABAS = [
   { id: 'zips', rotulo: 'ZIP Codes' },
@@ -47,19 +55,22 @@ export function ConfigPage() {
         ))}
       </nav>
 
-      {aba === 'zips' ? (
-        <ZipCodes podeEditar={podeEditar} />
-      ) : (
-        <div className="bg-surface border border-line rounded-xl p-10 text-center">
-          <div className="text-3xl mb-2">🚧</div>
-          <h2 className="text-[15px] font-bold text-ink">
-            {ABAS.find((a) => a.id === aba)?.rotulo}
-          </h2>
-          <p className="text-[13px] text-ink-3 max-w-md mx-auto leading-relaxed mt-1">
-            Entra nas próximas etapas.
-          </p>
-        </div>
-      )}
+      {aba === 'zips' ? <ZipCodes podeEditar={podeEditar} />
+        : aba === 'origens' ? <Origens podeEditar={podeEditar} />
+        : aba === 'cutoff' ? <Cutoff podeEditar={podeEditar} />
+        : aba === 'pagamento' ? <FormasPagamento podeEditar={podeEditar} />
+        : aba === 'mensagens' ? <Mensagens podeEditar={podeEditar} />
+        : (
+          <div className="bg-surface border border-line rounded-xl p-10 text-center">
+            <div className="text-3xl mb-2">🚧</div>
+            <h2 className="text-[15px] font-bold text-ink">
+              {ABAS.find((a) => a.id === aba)?.rotulo}
+            </h2>
+            <p className="text-[13px] text-ink-3 max-w-md mx-auto leading-relaxed mt-1">
+              Entra na próxima etapa.
+            </p>
+          </div>
+        )}
     </div>
   )
 }
