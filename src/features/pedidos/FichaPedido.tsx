@@ -145,9 +145,10 @@ export function FichaPedido({ dados, onCancelar, onCriado }: Props) {
                 </button>
               ))}
             </div>
+            {/* §5.4 */}
             {kind === 'addons_only' && (
               <p className="text-[11.5px] text-ink-muted mt-2">
-                Detox e sucos têm preço final: sem tax e sem delivery (§5.4).
+                Detox e sucos têm preço final: sem tax e sem delivery.
               </p>
             )}
           </Cartao>
@@ -350,7 +351,7 @@ export function FichaPedido({ dados, onCancelar, onCriado }: Props) {
             {parceria && (
               <p className="text-[11px] text-accent mt-1 leading-relaxed">
                 Valor pago fica $0 e o valor comercial é registrado à parte. Não entra
-                no Total Pedidos nem no faturamento (§6.4).
+                no Total Pedidos nem no faturamento.
               </p>
             )}
           </Cartao>

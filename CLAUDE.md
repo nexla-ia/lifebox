@@ -39,6 +39,10 @@ Corolários:
 - Semana ISO começando na segunda: `2026-W38`, exibida como `W38`.
 - Telefone em **E.164** (`+15085550164`) — é a chave de cruzamento com o WhatsApp.
 - Arredondamento do tax: half-up para 2 casas (`round()` do Postgres sobre centavos).
+- **`§` é marcador de código, nunca de tela.** Serve para achar a regra no
+  documento-mestre; a equipe da LifeBox não tem esse documento, e "(§5.4)" numa
+  nota de rodapé só some com a frase que explica a regra. Em texto visível,
+  escreva a regra; deixe o `§` no comentário ao lado.
 
 ## Estrutura
 

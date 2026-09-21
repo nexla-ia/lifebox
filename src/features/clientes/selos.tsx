@@ -32,7 +32,7 @@ export function SeloLead({ tipo }: { tipo: LeadType }) {
   ) : (
     <span
       className="bg-info-bg border border-info-line text-info rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold"
-      title="Já existe na base — nunca volta a ser New Lead (§6.2)"
+      title="Já existe na base — nunca volta a ser New Lead"   /* §6.2 */
     >
       ♻️ Old Lead
     </span>

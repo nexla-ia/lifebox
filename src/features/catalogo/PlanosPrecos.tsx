@@ -95,7 +95,7 @@ export function PlanosPrecos({ catalogo, podeEditar, onSaved }: Props) {
       {plans.length > 0 && (
       <Card
         titulo="Refeição e breakfast extras"
-        nota="Cobrados quando o pedido passa do limite do plano (§5.2). O unitário muda por faixa: um extra no plano de 10 custa menos que no de 5."
+        nota="Cobrados quando o pedido passa do limite do plano. O unitário muda por faixa: um extra no plano de 10 custa menos que no de 5."   /* §5.2 */
       >
         <table className="w-full text-[13px]">
           <thead>
@@ -134,7 +134,7 @@ export function PlanosPrecos({ catalogo, podeEditar, onSaved }: Props) {
 
       <Card
         titulo="✎ Pedido Personalizado"
-        nota="Unitário por tamanho, para pedidos fora da estrutura dos planos — 4, 8, 16 refeições, ou tamanhos misturados (§5.3). Cobra tax e delivery."
+        nota="Unitário por tamanho, para pedidos fora da estrutura dos planos — 4, 8, 16 refeições, ou tamanhos misturados. Cobra tax e delivery."   /* §5.3 */
       >
         <table className="w-full text-[13px]">
           <tbody>
