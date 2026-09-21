@@ -5,6 +5,7 @@ import { ErrorState, Loading } from '../../ui/states'
 import { fetchCatalogo } from './api'
 import { PlanosPrecos } from './PlanosPrecos'
 import { Adicionais } from './Adicionais'
+import { MenusCiclo } from './MenusCiclo'
 
 /* Tela 9.5 · Catálogo e menus. Ref: protótipo 5a–5f.
  *
@@ -64,14 +65,7 @@ export function CatalogoPage() {
           </div>
         ) : null
       ) : (
-        <div className="bg-surface border border-line rounded-xl p-10 text-center">
-          <div className="text-3xl mb-2">🗓️</div>
-          <h2 className="text-[15px] font-bold text-ink">Menus do ciclo</h2>
-          <p className="text-[13px] text-ink-3 max-w-md mx-auto leading-relaxed mt-1">
-            Os 4 menus em rotação automática, com os pratos de cada um e a trava do menu
-            em execução. É a próxima parte desta tela.
-          </p>
-        </div>
+        <MenusCiclo podeEditar={profile?.role === 'admin' || profile?.role === 'operacao'} />
       )}
     </div>
   )

@@ -81,3 +81,17 @@ export async function limparZips(zips: string[]) {
     },
   )
 }
+
+/** Remove pratos do teste. Vínculos de menu, tag, alérgeno e tamanho caem por
+ *  cascade; a foto no bucket é lixo inofensivo de 1 px. */
+export async function limparPratos(marca: string) {
+  const c = await conectar()
+  if (!c) return
+  await fetch(
+    `${c.url}/rest/v1/dishes?name_pt=like.${encodeURIComponent(`%${marca}%`)}`,
+    {
+      method: 'DELETE',
+      headers: { apikey: c.key, Authorization: `Bearer ${c.token}`, Prefer: 'return=minimal' },
+    },
+  )
+}

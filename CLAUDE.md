@@ -85,6 +85,11 @@ configuração tem que renderizar `ConfigMissing`, não body vazio.
 
 `vercel.json` faz o rewrite de SPA; sem ele, atualizar em `/semana` dá 404.
 
+Os testes que gravam no Supabase limpam em **hook `afterAll`**, nunca em
+`try/finally`: quando um teste estoura o timeout o Playwright aborta o corpo e
+o `finally` não chega a rodar, deixando lixo no banco da cliente. Marcam tudo
+com sufixo `zzt-<timestamp>` para nunca colidir com o catálogo real.
+
 `supabase/tests/00_local_stub.sql` só existe porque o Postgres puro não tem o
 schema `auth` nem os roles `authenticated`/`anon`. **Não é migration.**
 
@@ -127,6 +132,20 @@ O caminho principal de cadastro é **por cidade**: a equipe sabe as cidades que
 atende, não os CEPs. `zipsDaCidade('Framingham')` traz os 5 ZIPs de uma vez —
 as 27 cidades da W37 rendem ~84 ZIPs. A rota segue editável por ZIP, porque não
 é estritamente geográfica (Ashland é South Shore).
+
+## Menus do ciclo
+
+4 menus em rotação automática (§4). A trava do menu em execução **só vale
+quando a semana já tem pedido** — menu sem pedido nenhum segue editável, senão
+a equipe ficaria presa à toa. Sem semanas cadastradas, nada trava.
+
+Tirar um prato que está em pedido abre confirmação listando os afetados
+(`pedidosUsandoPrato`, tela 5d). Tirar do menu **não apaga o prato**: ele volta
+noutro ciclo.
+
+Fotos vão para o bucket `dish-photos` (migration 0800): leitura pública, porque
+o link público é sem sessão; escrita só para a equipe. O upload acontece
+**depois** de o prato ter id, para o caminho no Storage nunca colidir.
 
 ## Preço na tela de Catálogo
 

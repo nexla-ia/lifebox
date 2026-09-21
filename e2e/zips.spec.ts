@@ -13,9 +13,28 @@ const senha = process.env.E2E_SENHA
 
 // Medway tem poucos ZIPs — teste rápido e limpeza trivial
 const CIDADE = 'Medway'
+const paraLimpar: string[] = []
 
 test.describe('ZIP codes', () => {
+  // em série e nesta ordem: um teste exige a lista vazia e o outro a enche.
+  // Em paralelo eles disputam o mesmo estado e um falha sem haver bug.
+  test.describe.configure({ mode: 'serial' })
   test.skip(!email || !senha, 'defina E2E_EMAIL e E2E_SENHA para rodar')
+
+  // hook em vez de finally: timeout de teste aborta o corpo antes do finally
+  test.afterAll(() => limparZips(paraLimpar))
+
+  test('lista vazia avisa que o link público recusa tudo', async ({ page }) => {
+    await page.goto('/')
+    await page.getByLabel('E-mail').fill(email!)
+    await page.getByLabel('Senha').fill(senha!)
+    await page.getByRole('button', { name: 'Entrar' }).click()
+    await page.waitForURL(/overview/, { timeout: 20_000 })
+    await page.goto('/config')
+
+    await expect(page.getByText('Nenhum ZIP cadastrado')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(/recusa todo pedido por estar fora da área/)).toBeVisible()
+  })
 
   test('importa todos os ZIPs de uma cidade de uma vez', async ({ page }) => {
     await page.goto('/')
@@ -27,8 +46,7 @@ test.describe('ZIP codes', () => {
     await page.getByRole('link', { name: /Configurações/ }).click()
     await expect(page.getByRole('heading', { name: 'Configurações' })).toBeVisible()
 
-    let importados: string[] = []
-    try {
+    {
       await page.getByLabel('Cidade (Massachusetts)').fill(CIDADE)
       await page.getByRole('button', { name: 'Buscar ZIPs' }).click()
 
@@ -42,7 +60,8 @@ test.describe('ZIP codes', () => {
       await expect(lista.getByText(new RegExp(`ZIP codes atendidos · [1-9]`))).toBeVisible({ timeout: 15_000 })
       await expect(lista.getByText(CIDADE).first()).toBeVisible()
 
-      importados = await lista.locator('li strong').allInnerTexts()
+      const importados = await lista.locator('li strong').allInnerTexts()
+      paraLimpar.push(...importados)
       expect(importados.length).toBeGreaterThan(0)
 
       // persistiu? recarrega do banco
@@ -51,20 +70,7 @@ test.describe('ZIP codes', () => {
         page.locator('section').filter({ hasText: 'ZIP codes atendidos' })
           .getByText(CIDADE).first(),
       ).toBeVisible({ timeout: 15_000 })
-    } finally {
-      await limparZips(importados)
     }
   })
 
-  test('lista vazia avisa que o link público recusa tudo', async ({ page }) => {
-    await page.goto('/')
-    await page.getByLabel('E-mail').fill(email!)
-    await page.getByLabel('Senha').fill(senha!)
-    await page.getByRole('button', { name: 'Entrar' }).click()
-    await page.waitForURL(/overview/, { timeout: 20_000 })
-    await page.goto('/config')
-
-    await expect(page.getByText('Nenhum ZIP cadastrado')).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByText(/recusa todo pedido por estar fora da área/)).toBeVisible()
-  })
 })

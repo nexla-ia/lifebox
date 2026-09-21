@@ -15,6 +15,8 @@ const sufixo = `zzt-${Date.now().toString(36)}`
 test.describe('catálogo', () => {
   test.skip(!email || !senha, 'defina E2E_EMAIL e E2E_SENHA para rodar')
 
+  test.afterAll(() => limparMarca(sufixo))
+
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
     await page.getByLabel('E-mail').fill(email!)
@@ -27,7 +29,7 @@ test.describe('catálogo', () => {
     await page.goto('/catalogo')
     await expect(page.getByRole('heading', { name: 'Catálogo e menus' })).toBeVisible()
 
-    try {
+    {
       // --- criar o plano
       await page.getByRole('button', { name: '＋ Novo plano' }).click()
       await page.getByLabel('Nome (PT) *').fill(`Plano ${sufixo}`)
@@ -58,14 +60,12 @@ test.describe('catálogo', () => {
       const depois = page.locator('section').filter({ hasText: 'Fresh Plans' })
         .getByRole('row').filter({ hasText: `Plano ${sufixo}` })
       await expect(depois).toContainText('cliente paga $147.60', { timeout: 15_000 })
-    } finally {
-      await limparMarca(sufixo)
     }
   })
 
   test('cria adicional e respeita as chaves de tax, delivery e plano', async ({ page }) => {
     await page.goto('/catalogo')
-    try {
+    {
       await page.getByRole('button', { name: '＋ Adicionar' }).click()
       await page.getByLabel('Nome (PT) *').fill(`Sucos ${sufixo}`)
       await page.getByLabel('Nome (EN) *').fill(`Juices ${sufixo}`)
@@ -78,8 +78,6 @@ test.describe('catálogo', () => {
       await expect(item).toContainText('$29.90')
       await expect(item).toContainText('sem tax · sem delivery')
       await expect(item).toContainText('só com plano')
-    } finally {
-      await limparMarca(sufixo)
     }
   })
 })
