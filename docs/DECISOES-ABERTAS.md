@@ -189,6 +189,32 @@ passar a confirmar sozinho.
 
 ---
 
+## 12. Retirada pelo link público
+
+**Como estamos agora:** o link público **só faz entrega**.
+
+As telas aprovadas do link pedem o endereço em todos os caminhos e bloqueiam
+quem está fora da área (6f); retirada não aparece em nenhuma delas. Então quem
+quiser retirar combina com vocês pelo WhatsApp, e a equipe lança o pedido como
+pick-up pela tela da Semana — que já faz isso.
+
+Se vocês quiserem que o próprio cliente escolha retirada no link, é uma opção
+a mais no primeiro passo. Digam que entra.
+
+---
+
+## 13. Quantas vezes a mesma pessoa pode tentar pelo link
+
+**Como estamos agora:** por número de WhatsApp, **6 consultas de cadastro a
+cada 10 minutos** e **3 pedidos a cada 30 minutos**. Por IP, 12 e 6.
+
+O limite existe porque o link é aberto: sem ele, alguém poderia ficar testando
+números para descobrir quem é cliente de vocês. Os números acima são folgados
+para uso normal — ninguém preenche três pedidos em meia hora sem querer. Se
+atrapalharem em alguma campanha, a gente afrouxa.
+
+---
+
 ## Sobre o catálogo
 
 Pratos, planos, preços, adicionais, formas de pagamento e origens **não vêm

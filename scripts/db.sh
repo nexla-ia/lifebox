@@ -64,7 +64,7 @@ case "${1:-}" in
       echo "      cluster local parado? rode: npm run db:up" >&2
       exit 1
     fi
-    for t in pricing semanas pedidos bags rls; do
+    for t in pricing semanas pedidos bags link rls; do
       psql "$DB_URL" -v ON_ERROR_STOP=1 -f "supabase/tests/${t}_test.sql" 2>&1 \
         | grep -E 'NOTICE|ERROR|FALHOU' | sed 's/^psql:[^ ]* //; s/NOTICE:  //'
     done
