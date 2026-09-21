@@ -44,7 +44,9 @@ Cidades que apareceram na W37, por rota:
 | South Shore | Ashland, Hanover, Rockland, Weymouth, Whitman, Fall River |
 | Pick-up | Holliston, Whitinsville |
 
-Uma cidade pode ter vários CEPs, então precisamos da lista por CEP mesmo.
+Confiram se a lista de cidades está completa — a planilha mostra só quem
+pediu naquela semana, então pode faltar cidade que vocês atendem e não teve
+pedido na W37.
 
 ---
 
