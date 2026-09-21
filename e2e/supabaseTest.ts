@@ -137,3 +137,71 @@ export async function limparClientes(telefones: string[]) {
     method: 'DELETE', headers: { Prefer: 'return=minimal' },
   })
 }
+
+/** Massa para o teste de pedido: plano com preços, pratos no menu da semana
+ *  corrente e um cliente. Devolve o que precisa ser apagado depois. */
+export async function criarFixturePedido(marca: string) {
+  const c = await conectar()
+  if (!c) return null
+  const post = async (t: string, body: unknown) => {
+    const r = await rest(t, { method: 'POST', body: JSON.stringify(body) })
+    return (await r!.json()) as Record<string, string>[]
+  }
+  const get = async (q: string) => {
+    const r = await rest(q)
+    return (await r!.json()) as Record<string, string>[]
+  }
+
+  const [small] = await get('sizes?select=id&code=eq.S')
+  const [plano] = await post('plans', {
+    name_pt: `Plano ${marca}`, name_en: `Plan ${marca}`,
+    meals_qty: 10, breakfasts_qty: 5, active: true,
+  })
+  await post('plan_prices', { plan_id: plano.id, size_id: small.id, base_price_cents: 12860 })
+  await post('extra_prices', [
+    { plan_id: plano.id, size_id: small.id, item_kind: 'meal', unit_price_cents: 1075 },
+    { plan_id: plano.id, size_id: small.id, item_kind: 'breakfast', unit_price_cents: 423 },
+  ])
+
+  const pratos = await post('dishes', [
+    { name_pt: `Prato ${marca}`, name_en: `Dish ${marca}`, category: 'classico', active: true },
+    { name_pt: `Bkf ${marca}`, name_en: `Bkf ${marca}`, category: 'breakfast', active: true },
+  ])
+
+  // liga os pratos no menu da semana corrente
+  const r = await fetch(`${c.url}/rest/v1/rpc/fn_semana_atual`, {
+    method: 'POST',
+    headers: { apikey: c.key, Authorization: `Bearer ${c.token}`, 'Content-Type': 'application/json' },
+    body: '{}',
+  })
+  const weekId = (await r.json()) as string
+  const [semana] = await get(`weeks?select=menu_id,iso_code&id=eq.${weekId}`)
+  await post('menu_dishes', pratos.map((p) => ({
+    menu_id: semana.menu_id, dish_id: p.id, active: true,
+  })))
+
+  const telefone = `+1555${marca}`
+  const [cliente] = await post('customers', {
+    first_name: `Cliente ${marca}`, phone_e164: telefone, status: 'ativo',
+  })
+
+  return {
+    planoId: plano.id, sizeId: small.id, pratoId: pratos[0].id, bkfId: pratos[1].id,
+    clienteId: cliente.id, telefone, weekId, isoCode: semana.iso_code,
+  }
+}
+
+export async function limparFixturePedido(marca: string, telefone: string) {
+  // ORDEM IMPORTA: orders.customer_id NÃO tem ON DELETE CASCADE, então apagar
+  // o cliente antes é recusado em silêncio e tudo fica no banco da cliente.
+  const r = await rest(`customers?select=id&phone_e164=eq.${encodeURIComponent(telefone)}`)
+  const [cli] = r ? ((await r.json()) as { id: string }[]) : []
+  if (cli) {
+    await rest(`orders?customer_id=eq.${cli.id}`,
+               { method: 'DELETE', headers: { Prefer: 'return=minimal' } })
+  }
+  await limparClientes([telefone])
+  await limparPratos(marca)
+  await rest(`plans?name_pt=like.${encodeURIComponent(`%${marca}%`)}`,
+             { method: 'DELETE', headers: { Prefer: 'return=minimal' } })
+}

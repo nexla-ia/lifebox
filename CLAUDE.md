@@ -121,6 +121,24 @@ Sinal para diagnosticar: se login com e-mail **inexistente** devolve 400
 `invalid_credentials` mas o e-mail real devolve 500, o schema está são e o
 problema é a linha daquele usuário.
 
+## Pedidos
+
+`fn_create_order` faz preço, código, itens com snapshot e a linha de
+`customer_weeks` **numa transação só** — meio caminho deixaria pedido sem valor
+ou semana sem status. `rpc_precificar` dá a prévia sem gravar.
+
+O front **não sabe somar preço**, e é de propósito: manda itens, recebe total
+(§2). `src/lib/precos.ts` existe só para a tela de Catálogo mostrar o preço
+final derivado enquanto alguém digita a base.
+
+Semana: `fn_ensure_week` é idempotente e o cutoff sai no fuso operacional, não
+no do servidor. Cuidado — `fn_passou_cutoff` é STABLE e enxerga o snapshot do
+início do statement, então criar a semana e consultá-la na mesma linha não
+funciona.
+
+Ao apagar dado de teste, **apague pedidos antes do cliente**:
+`orders.customer_id` não tem `ON DELETE CASCADE` e o DELETE falha em silêncio.
+
 ## Telefone
 
 `src/lib/telefone.ts` normaliza para **E.164** — é o identificador que cruza
