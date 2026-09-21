@@ -13,7 +13,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-PGDATA_DIR="${LIFEBOX_PGDATA:-$TMPDIR/lifebox-pgdata}"
+# só usado pelo cluster local; com DATABASE_URL apontando para o Supabase este
+# caminho nunca é tocado — mas com `set -u` ele precisa resolver mesmo assim.
+PGDATA_DIR="${LIFEBOX_PGDATA:-${TMPDIR:-/tmp}/lifebox-pgdata}"
 PORT="${LIFEBOX_PGPORT:-5440}"
 LOCAL_URL="postgresql://postgres@localhost:$PORT/lifebox"
 DB_URL="${DATABASE_URL:-$LOCAL_URL}"

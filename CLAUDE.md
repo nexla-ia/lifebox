@@ -88,6 +88,30 @@ configuração tem que renderizar `ConfigMissing`, não body vazio.
 `supabase/tests/00_local_stub.sql` só existe porque o Postgres puro não tem o
 schema `auth` nem os roles `authenticated`/`anon`. **Não é migration.**
 
+## Usuários
+
+O perfil operacional vive em `public.profiles`; quem cria a linha é o gatilho
+`on_auth_user_created`, lendo `full_name` e `role` do metadata do Auth. Assim
+não existe usuário autenticado sem perfil.
+
+Primeiro Administrador (não tem quem o convide):
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1   -v email=... -v senha=... -v nome='...' -v papel=admin   -f supabase/tools/criar_usuario.sql
+```
+
+**Armadilha, já paga:** `auth.users` tem quatro colunas sem DEFAULT —
+`confirmation_token`, `recovery_token`, `email_change_token_new` e
+`email_change`. O GoTrue as lê como string não-nula, então deixá-las NULL faz
+o login devolver `500 Database error querying schema`. O erro não menciona
+senha nem credencial, e acontece **antes** de conferir a senha — parece
+problema de schema. O `criar_usuario.sql` preenche com `''` e tem um guard que
+falha se sobrar algum nulo.
+
+Sinal para diagnosticar: se login com e-mail **inexistente** devolve 400
+`invalid_credentials` mas o e-mail real devolve 500, o schema está são e o
+problema é a linha daquele usuário.
+
 ## Permissões (§3)
 
 Três perfis, e a RLS é quem manda — o guarda de rota no front é só cortesia.
