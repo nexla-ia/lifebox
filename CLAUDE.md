@@ -73,6 +73,18 @@ npm run db:down
 Para rodar contra o Supabase: `export DATABASE_URL=...` e use `db:reset` /
 `db:test` (o stub do schema `auth` é pulado sozinho).
 
+## Testes de navegador
+
+`npm run e2e` (Playwright) sobe o build e checa no Chromium de verdade.
+
+Os testes de `e2e/smoke.spec.ts` rodam **sem** as variáveis do Supabase de
+propósito: existem porque o primeiro deploy na Vercel veio em branco — o client
+lançava exceção no import e matava o bundle antes do React montar. Regra que
+eles guardam: **nenhuma tela pode vir em branco** (§8, tela 9f). Falta de
+configuração tem que renderizar `ConfigMissing`, não body vazio.
+
+`vercel.json` faz o rewrite de SPA; sem ele, atualizar em `/semana` dá 404.
+
 `supabase/tests/00_local_stub.sql` só existe porque o Postgres puro não tem o
 schema `auth` nem os roles `authenticated`/`anon`. **Não é migration.**
 
