@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import './env'
 
 /** Guarda-corpo contra o bug que derrubou o primeiro deploy: o app quebrava no
  *  import quando faltavam as variáveis do Supabase, e a página vinha em branco

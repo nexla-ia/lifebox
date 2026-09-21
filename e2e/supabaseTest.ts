@@ -211,3 +211,36 @@ export async function limparMeta(isoCode: string) {
   await rest(`goals?period_type=eq.week&period_key=eq.${encodeURIComponent(isoCode)}`,
              { method: 'DELETE', headers: { Prefer: 'return=minimal' } })
 }
+
+/** Cria um pedido direto pela RPC, sem passar pela tela — para testes que
+ *  precisam de pedido pronto e não estão testando a ficha. */
+export async function criarPedidoDireto(
+  fx: { clienteId: string; weekId: string; planoId: string; sizeId: string
+        pratoId: string; bkfId: string },
+  refeicoes: number,
+  breakfasts: number,
+  kitchenNotes?: string,
+) {
+  const c = await conectar()
+  if (!c) return
+  if (kitchenNotes) {
+    await rest(`customers?id=eq.${fx.clienteId}`, {
+      method: 'PATCH', body: JSON.stringify({ kitchen_notes: kitchenNotes }),
+      headers: { Prefer: 'return=minimal' },
+    })
+  }
+  await fetch(`${c.url}/rest/v1/rpc/fn_create_order`, {
+    method: 'POST',
+    headers: { apikey: c.key, Authorization: `Bearer ${c.token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      p: {
+        customer_id: fx.clienteId, week_id: fx.weekId, kind: 'plan',
+        plan_id: fx.planoId, size_id: fx.sizeId, fulfillment: 'delivery',
+        items: [
+          { type: 'dish', dish_id: fx.pratoId, qty: refeicoes },
+          { type: 'dish', dish_id: fx.bkfId, qty: breakfasts },
+        ],
+      },
+    }),
+  })
+}

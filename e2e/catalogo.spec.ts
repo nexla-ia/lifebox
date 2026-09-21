@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import './env'
 import { limparMarca } from './supabaseTest'
 
 /** Catálogo ponta a ponta contra o Supabase real.

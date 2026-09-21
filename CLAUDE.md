@@ -89,6 +89,12 @@ O e2e roda **serial** (`workers: 1`, `fullyParallel: false`): há um banco só,
 compartilhado por todos os specs. Um teste cria ZIP enquanto outro exige a
 lista vazia — em paralelo isso falha sem existir bug.
 
+`e2e/env.ts` carrega `.env.local` antes dos specs: sem isso, esquecer de
+exportar `E2E_EMAIL` faz os testes **pularem em silêncio** e a saída fica
+verde. Pelo mesmo motivo, `scripts/db.sh test` aborta com exit 1 se não
+conseguir conectar — runner que reporta "0 falhas" sem ter rodado é o pior
+resultado possível.
+
 Os testes que gravam no Supabase limpam em **hook `afterAll`**, nunca em
 `try/finally`: quando um teste estoura o timeout o Playwright aborta o corpo e
 o `finally` não chega a rodar, deixando lixo no banco da cliente. Marcam tudo
@@ -138,6 +144,20 @@ funciona.
 
 Ao apagar dado de teste, **apague pedidos antes do cliente**:
 `orders.customer_id` não tem `ON DELETE CASCADE` e o DELETE falha em silêncio.
+
+## Produção
+
+A Cozinha alcança só `v_production` e `v_kitchen_notes` (§3). A **matriz**
+mostra nome de cliente, então é consulta direta a `order_items` e nem aparece
+para ela — se aparecesse, a RLS devolveria vazio.
+
+A Produção **não cria semana**: `fetchSemanaCorrente` só lê. Criar é escrita, e
+a Cozinha não escreve em `weeks`. A migration 1100 abriu leitura de `weeks`,
+`menus` e `sizes` a qualquer autenticado — a folha precisa do código da semana
+e das colunas S/L, e nada disso é sensível.
+
+Ordem das colunas de tamanho vem de `sizes.position`, **nunca** de sort
+alfabético: "L" < "S" inverteria Large e Small.
 
 ## Painel da Semana
 

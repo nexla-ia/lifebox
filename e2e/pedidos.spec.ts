@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import './env'
 import { criarFixturePedido, limparFixturePedido } from './supabaseTest'
 
 /** Pedido ponta a ponta: monta na tela e confere o total.

@@ -93,3 +93,14 @@
   background-size: 800px 100%;
   animation: lbShimmer 1.3s linear infinite;
 }
+
+/* Impressão — a folha da cozinha vai para a bancada em papel (§9.3).
+   Sem isto, a nav verde come 176px de cada página e os blocos quebram no meio. */
+@media print {
+  @page { margin: 12mm; }
+  nav, .print\:hidden { display: none !important; }
+  body { background: #fff; }
+  .break-inside-avoid { break-inside: avoid; }
+  /* tinta: fundo escuro vira borda, não mancha de toner */
+  * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import './env'
 import { limparZips } from './supabaseTest'
 
 /** Importação de ZIPs por cidade. Ref: protótipo 9d.

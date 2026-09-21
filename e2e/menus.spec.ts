@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import './env'
 import { limparPratos } from './supabaseTest'
 
 /** Menus do ciclo e cadastro de prato. Ref: protótipo 5c, 5d, 5e.

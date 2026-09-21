@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import './env'
 import { criarFixturePedido, limparFixturePedido, limparMeta } from './supabaseTest'
 
 /** Painel da Semana. Ref: protótipo 10a e 9a.

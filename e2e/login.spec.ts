@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import './env'
 
 /** Login de verdade contra o Supabase configurado.
  *

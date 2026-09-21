@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import './env'
 import { criarZipTeste, limparClientes, limparZip } from './supabaseTest'
 
 /** Clientes. Ref: protótipo 4a, 4b, 4c, 4d.

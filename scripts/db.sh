@@ -57,6 +57,13 @@ case "${1:-}" in
     ;;
 
   test)
+    # Sem esta checagem, cluster parado devolve "0 falhas" e parece verde —
+    # o pior tipo de resultado, porque nada rodou e ninguém percebe.
+    if ! psql "$DB_URL" -tAc 'select 1' >/dev/null 2>&1; then
+      echo "ERRO: não consegui conectar ao banco." >&2
+      echo "      cluster local parado? rode: npm run db:up" >&2
+      exit 1
+    fi
     for t in pricing semanas pedidos rls; do
       psql "$DB_URL" -v ON_ERROR_STOP=1 -f "supabase/tests/${t}_test.sql" 2>&1 \
         | grep -E 'NOTICE|ERROR|FALHOU' | sed 's/^psql:[^ ]* //; s/NOTICE:  //'
