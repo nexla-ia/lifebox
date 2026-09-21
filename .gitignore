@@ -1,0 +1,25 @@
+node_modules
+dist
+dist-ssr
+*.local
+.env
+.env.*
+!.env.example
+
+# dados pessoais reais de clientes — NUNCA versionar (LIFEBOX_PROJECT.md §12)
+.private/
+
+# supabase
+supabase/.temp
+supabase/.branches
+
+# playwright
+test-results/
+playwright-report/
+blob-report/
+
+.DS_Store
+*.log
+.vscode/*
+!.vscode/extensions.json
+.idea

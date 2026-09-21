@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+/* LifeBox · design tokens
+   Extraídos do protótipo aprovado (docs/telas/LifeBox Telas.dc.html).
+   Identidade do Redesign 2023 dessaturada para ferramenta de trabalho:
+   creme de fundo, verde-escuro na ação principal, verde-médio nos valores,
+   lima só em detalhe de marca, laranja reservado ao cutoff. */
+
+@theme {
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+
+  /* marca */
+  --color-brand:        #24513B;   /* nav, botão primário */
+  --color-brand-hover:  #1C4030;
+  --color-brand-mid:    #3E7A52;   /* valores, links */
+  --color-lime:         #C4D24E;   /* detalhe de marca */
+  --color-olive:        #8FA96B;   /* séries de gráfico */
+
+  /* superfícies */
+  --color-cream:        #F5F2EA;   /* fundo da aplicação */
+  --color-surface:      #FFFFFF;
+  --color-surface-alt:  #FDFCF8;   /* input, cabeçalho de tabela */
+  --color-muted-bg:     #EFECE0;
+
+  /* texto */
+  --color-ink:          #232B20;
+  --color-ink-2:        #4A5442;
+  --color-ink-3:        #6B6653;
+  --color-ink-muted:    #98937F;
+
+  /* bordas */
+  --color-line:         #E5E0D0;
+  --color-line-strong:  #D8D2BF;
+  --color-line-soft:    #F2EFE4;
+
+  /* nav */
+  --color-nav-item:     #B9CBB9;
+
+  /* status · ✅ Novo Pedido */
+  --color-ok:           #22633A;
+  --color-ok-bg:        #E3F0E4;
+  --color-ok-line:      #BFDCC5;
+
+  /* status · 🔁 Renovação, ♻️ Old Lead */
+  --color-info:         #2B5E8C;
+  --color-info-bg:      #E4EDF6;
+  --color-info-line:    #BFD4E8;
+
+  /* status · 🕒 Skip, cutoff, atenção */
+  --color-warn:         #8A6116;
+  --color-warn-bg:      #FBF0DC;
+  --color-warn-line:    #E7D3A8;
+  --color-warn-strong:  #B98A2E;
+
+  /* status · ❌ Cancelamento, erro */
+  --color-danger:       #A33B2E;
+  --color-danger-bg:    #FAE5E1;
+  --color-danger-line:  #E8BDB4;
+
+  /* selo pós-cutoff */
+  --color-late:         #D97B3F;
+  --color-late-text:    #B4530A;
+  --color-late-bg:      #FFF6EA;
+  --color-late-line:    #EDCBA8;
+
+  /* status · 🎁 Parceria, 🧃 Detox e adicionais */
+  --color-accent:       #6B4FA1;
+  --color-accent-bg:    #EEE7F6;
+  --color-accent-line:  #D4C6E8;
+
+  /* chip de menu do ciclo */
+  --color-leaf:         #5A6524;
+  --color-leaf-bg:      #E9EDD3;
+  --color-leaf-line:    #D5DCA4;
+}
+
+@layer base {
+  body {
+    background: var(--color-cream);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+  /* valores monetários e contagens sempre em tabular (protótipo inteiro) */
+  .tnum { font-variant-numeric: tabular-nums; }
+}
+
+@keyframes lbShimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #EFECE0 25%, #F8F6EE 50%, #EFECE0 75%);
+  background-size: 800px 100%;
+  animation: lbShimmer 1.3s linear infinite;
+}
