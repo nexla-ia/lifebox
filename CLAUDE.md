@@ -103,6 +103,14 @@ com sufixo `zzt-<timestamp>` para nunca colidir com o catálogo real.
 `supabase/tests/00_local_stub.sql` só existe porque o Postgres puro não tem o
 schema `auth` nem os roles `authenticated`/`anon`. **Não é migration.**
 
+**Armadilha, já paga:** `getByRole('button', { name })` casa o nome por
+**substring**, não por igualdade. Em par de rótulo que só ganha prefixo —
+`Marcar X como montado` / `Desmarcar X como montado` — esperar o botão "voltar
+para Marcar" passa na hora, com o estado ainda inalterado: o `Marcar…` está
+inteiro dentro do `Desmarcar…`. O teste segue, navega antes de a RPC terminar,
+e o erro aparece lá adiante como saldo que não fecha. Em toggle, use
+`exact: true` (helper `botao()` em `e2e/montagem.spec.ts`).
+
 ## Usuários
 
 O perfil operacional vive em `public.profiles`; quem cria a linha é o gatilho
@@ -171,6 +179,27 @@ PostgREST recusa com "more than one relationship was found".
 Valores sem rótulo visível (Faturado, A receber) levam `aria-label` — melhora
 leitor de tela e evita que o teste tenha que caçar o rótulo pela estrutura do
 DOM.
+
+## Montagem e bags
+
+Marcar **Montado** e registrar o envio da bag são a mesma operação
+(`fn_marcar_montado`, §6.7): separar as duas faria o saldo mentir sem dar erro
+nenhum — só aparece semanas depois, faltando bag na cozinha. A função é
+idempotente: clicar de novo ou corrigir o número **ajusta** o movimento em vez
+de empilhar outro.
+
+Fora do controle de bag, com 0: quem não usa bag térmica e quem retira na
+cozinha (pick-up).
+
+Desmarcar é desfazer clique errado, não apagar história: com devolução já
+registrada a função **recusa**, senão o saldo ficaria negativo — alguém teria
+devolvido o que o sistema diz que nunca saiu. A mensagem é escrita para quem
+está na folha, então a tela **tem** de mostrá-la; ação de tela que engole
+`error` da RPC vira clique sem efeito e sem explicação.
+
+Saldo e estoque são globais: `bag_stock_total` é `settings` e não tem dono.
+Teste que mexe neles guarda o valor de antes e devolve no `afterAll`, e mede
+**diferença**, nunca valor absoluto.
 
 ## Telefone
 

@@ -220,12 +220,17 @@ export async function criarPedidoDireto(
   refeicoes: number,
   breakfasts: number,
   kitchenNotes?: string,
+  deliveryNotes?: string,
 ) {
   const c = await conectar()
   if (!c) return
-  if (kitchenNotes) {
+  if (kitchenNotes || deliveryNotes) {
     await rest(`customers?id=eq.${fx.clienteId}`, {
-      method: 'PATCH', body: JSON.stringify({ kitchen_notes: kitchenNotes }),
+      method: 'PATCH',
+      body: JSON.stringify({
+        ...(kitchenNotes ? { kitchen_notes: kitchenNotes } : {}),
+        ...(deliveryNotes ? { delivery_notes: deliveryNotes } : {}),
+      }),
       headers: { Prefer: 'return=minimal' },
     })
   }
@@ -242,5 +247,23 @@ export async function criarPedidoDireto(
         ],
       },
     }),
+  })
+}
+
+/** Estoque total de bags. É `settings`, global e sem dono: o teste guarda o
+ *  valor de antes e devolve no afterAll. Deixar 1 ali faria a tela avisar
+ *  "mais bags na rua do que no estoque" para a equipe, sem nada ter acontecido. */
+export async function lerEstoqueBags(): Promise<number> {
+  const r = await rest('settings?select=value&key=eq.bag_stock_total')
+  if (!r) return 0
+  const [linha] = (await r.json()) as { value: unknown }[]
+  return Number(linha?.value ?? 0)
+}
+
+export async function setEstoqueBags(total: number) {
+  await rest('settings?key=eq.bag_stock_total', {
+    method: 'PATCH',
+    body: JSON.stringify({ value: total }),
+    headers: { Prefer: 'return=minimal' },
   })
 }
