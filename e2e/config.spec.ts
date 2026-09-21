@@ -44,6 +44,34 @@ test.describe('configurações', () => {
     await limparFormas(marca)
   })
 
+  test('o link público tem de onde ser copiado, e diz o que falta', async ({ page }) => {
+    await entrar(page, 'Link público')
+
+    // o endereço que a equipe manda no WhatsApp
+    await expect(page.getByLabel('Link principal'))
+      .toHaveValue(/\/pedido$/, { timeout: 20_000 })
+    await expect(page.getByLabel('Abrindo direto em português'))
+      .toHaveValue(/\/pedido\?lang=pt$/)
+
+    // sem catálogo nem ZIP, o link não fecha pedido — e a tela diz por quê,
+    // em vez de deixar a equipe descobrir pelo cliente reclamando
+    const checagens = page.getByRole('listitem')
+    await expect(checagens.filter({ hasText: 'ZIP code' })).toBeVisible()
+    await expect(checagens.filter({ hasText: 'forma' })).toBeVisible()
+    await expect(checagens.filter({ hasText: 'prato' })).toBeVisible()
+
+    // e o estado da janela de pedido, que vem do cutoff no servidor
+    await expect(page.getByText(/Aberto agora|Fechado/)).toBeVisible()
+  })
+
+  test('a aba fica na URL, então recarregar não perde o lugar', async ({ page }) => {
+    await entrar(page, 'Mensagens')
+    await expect(page).toHaveURL(/aba=mensagens/)
+    await page.reload()
+    await expect(page.getByLabel('Template em português'))
+      .toBeVisible({ timeout: 20_000 })
+  })
+
   test('origem nova entra na lista e o nome repetido é recusado', async ({ page }) => {
     await entrar(page, 'Origens')
 

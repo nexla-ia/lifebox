@@ -176,3 +176,59 @@ export const definirPapel = (id: string, papel: Usuario['role']) =>
 
 export const definirStatus = (id: string, status: Usuario['status']) =>
   supabase.rpc('fn_definir_status', { p_user: id, p_status: status })
+
+// ------------------------------------------------------- link público (9.7)
+export type ProntidaoLink = {
+  zips: number
+  formas: number
+  planos: number
+  pratos: number
+  semana: {
+    iso_code: string
+    aberto: boolean
+    cutoff_at: string
+    entrega: string
+    proxima_abertura: string
+    proxima_iso: string
+  } | null
+}
+
+/** O que impede um cliente de fechar pedido agora.
+ *
+ *  Cada uma destas quatro coisas derruba o link de um jeito diferente, e todas
+ *  em silêncio: sem ZIP ele recusa por área, sem forma de pagamento não há o
+ *  que escolher, sem plano com preço não há o que pedir, sem prato no menu da
+ *  semana a etapa 3 vem vazia. A equipe descobriria pelo cliente reclamando. */
+export async function fetchProntidaoLink(): Promise<{
+  data: ProntidaoLink | null; error: { message: string } | null
+}> {
+  const semana = await supabase.rpc('fn_link_semana')
+  if (semana.error) return { data: null, error: { message: semana.error.message } }
+  const s = semana.data as ProntidaoLink['semana'] & { week_id: string }
+
+  const [zips, formas, precos, menu] = await Promise.all([
+    supabase.from('zip_codes').select('zip', { count: 'exact', head: true }).eq('active', true),
+    supabase.from('payment_methods').select('id', { count: 'exact', head: true }).eq('active', true),
+    supabase.from('plan_prices').select('plan_id', { count: 'exact', head: true }),
+    supabase.from('weeks').select('menu_id').eq('id', s.week_id).single(),
+  ])
+
+  let pratos = 0
+  if (menu.data?.menu_id) {
+    const { count } = await supabase
+      .from('menu_dishes').select('dish_id', { count: 'exact', head: true })
+      .eq('menu_id', menu.data.menu_id).eq('active', true)
+    pratos = count ?? 0
+  }
+
+  return {
+    error: null,
+    data: {
+      zips: zips.count ?? 0,
+      formas: formas.count ?? 0,
+      planos: precos.count ?? 0,
+      pratos,
+      semana: s,
+    },
+  }
+}

@@ -107,6 +107,12 @@ com sufixo `zzt-<timestamp>` para nunca colidir com o catálogo real.
 `supabase/tests/00_local_stub.sql` só existe porque o Postgres puro não tem o
 schema `auth` nem os roles `authenticated`/`anon`. **Não é migration.**
 
+**Aba e filtro moram na URL, não no estado.** Recarregar no meio de um
+cadastro voltava para a primeira aba, e não havia como mandar "abre a aba de
+ZIPs" para alguém. E o redirecionamento de login guarda `pathname` + `search` +
+`hash`: só com o pathname, recarregar qualquer tela com parâmetro perdia o
+parâmetro e parecia que o sistema ignorou o clique.
+
 **`useQuery` não apaga a tela ao recarregar.** `loading` é só a primeira carga
 e a troca de parâmetro; `reload()` depois de gravar devolve `refreshing` e
 mantém o conteúdo. Trocar tudo por esqueleto some com o formulário, perde o
@@ -257,6 +263,12 @@ cluster local não há GRANT e vem `42501`; no Supabase o grant existe e quem
 barra é a RLS, devolvendo **vazio**. `link_test.sql` cobra o resultado — não
 sai dado — e exige RLS ligada em **toda** tabela de `public`: tabela nova sem
 RLS no Supabase nasce aberta para o anon.
+
+O endereço do link mora em **Configurações › Link público**, primeira aba: é
+de lá que a equipe copia para mandar no WhatsApp. A mesma aba mostra o que
+impede um pedido de fechar agora — sem ZIP, sem forma de pagamento ativa, sem
+plano com preço ou sem prato no menu da semana, o link quebra de quatro jeitos
+diferentes e todos em silêncio.
 
 Tudo que a tela checa, o servidor checa de novo, porque a tela é do cliente:
 cutoff (§4), ZIP atendido (§6.1), formato do telefone e pedido duplicado na

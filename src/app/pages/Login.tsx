@@ -15,9 +15,17 @@ export function Login() {
   const [busy, setBusy] = useState(false)
   const loc = useLocation()
 
-  // quem chegou aqui por link direto volta para onde queria ir, não para a
-  // tela inicial do perfil
-  const destino = (loc.state as { from?: { pathname?: string } } | null)?.from?.pathname
+  /** Quem chegou aqui por link direto volta para onde queria ir, não para a
+   *  tela inicial do perfil.
+   *
+   *  `search` e `hash` junto, não só o `pathname`: sem eles, recarregar uma
+   *  tela com parâmetro na URL (uma aba de Configurações, uma busca) voltava
+   *  para a mesma rota sem o parâmetro — a pessoa perdia o lugar e parecia que
+   *  o sistema tinha ignorado o clique. */
+  const de = (loc.state as { from?: Partial<Location> } | null)?.from
+  const destino = de?.pathname
+    ? `${de.pathname}${de.search ?? ''}${de.hash ?? ''}`
+    : null
   if (session && profile) return <Navigate to={destino ?? '/'} replace />
 
   async function entrar(e: React.FormEvent) {

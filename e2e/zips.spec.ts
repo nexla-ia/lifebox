@@ -32,6 +32,8 @@ test.describe('ZIP codes', () => {
     await page.getByRole('button', { name: 'Entrar' }).click()
     await page.waitForURL(/overview/, { timeout: 20_000 })
     await page.goto('/config')
+    // a aba inicial passou a ser o Link público, que é o que a equipe mais abre
+    await page.getByRole('button', { name: 'ZIP Codes', exact: true }).click()
 
     await expect(page.getByText('Nenhum ZIP cadastrado')).toBeVisible({ timeout: 15_000 })
     await expect(page.getByText(/recusa todo pedido por estar fora da área/)).toBeVisible()
@@ -46,6 +48,7 @@ test.describe('ZIP codes', () => {
 
     await page.getByRole('link', { name: /Configurações/ }).click()
     await expect(page.getByRole('heading', { name: 'Configurações' })).toBeVisible()
+    await page.getByRole('button', { name: 'ZIP Codes', exact: true }).click()
 
     {
       await page.getByLabel('Cidade (Massachusetts)').fill(CIDADE)

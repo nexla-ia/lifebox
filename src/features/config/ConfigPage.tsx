@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../lib/auth'
 import { Cutoff } from './Cutoff'
 import { FormasPagamento } from './FormasPagamento'
+import { LinkPublico } from './LinkPublico'
 import { Mensagens } from './Mensagens'
 import { Origens } from './Origens'
 import { Usuarios } from './Usuarios'
@@ -16,6 +17,9 @@ import { ZipCodes } from './ZipCodes'
  * ZIPs vêm primeiro porque sem a lista o link público recusa todo pedido. */
 
 const ABAS = [
+  // primeira aba: é o endereço que a equipe manda para o cliente, e antes
+  // dela existir ninguém sabia de cor onde o link ficava
+  { id: 'link', rotulo: 'Link público' },
   { id: 'zips', rotulo: 'ZIP Codes' },
   { id: 'origens', rotulo: 'Origens' },
   { id: 'cutoff', rotulo: 'Cutoff' },
@@ -28,8 +32,18 @@ type AbaId = (typeof ABAS)[number]['id']
 
 export function ConfigPage() {
   const { profile } = useAuth()
-  const [aba, setAba] = useState<AbaId>('zips')
   const podeEditar = profile?.role === 'admin'
+
+  /** A aba mora na URL, não no estado: recarregar a página no meio de um
+   *  cadastro voltava para a primeira aba, e não havia como mandar "abre a aba
+   *  de ZIPs" para alguém. */
+  const [params, setParams] = useSearchParams()
+  const pedida = params.get('aba') as AbaId | null
+  const aba: AbaId = ABAS.some((a) => a.id === pedida) ? pedida! : 'link'
+  const setAba = (id: AbaId) => {
+    params.set('aba', id)
+    setParams(params, { replace: true })
+  }
 
   return (
     <div className="p-5 flex flex-col gap-4 min-h-screen">
@@ -56,7 +70,8 @@ export function ConfigPage() {
         ))}
       </nav>
 
-      {aba === 'zips' ? <ZipCodes podeEditar={podeEditar} />
+      {aba === 'link' ? <LinkPublico />
+        : aba === 'zips' ? <ZipCodes podeEditar={podeEditar} />
         : aba === 'origens' ? <Origens podeEditar={podeEditar} />
         : aba === 'cutoff' ? <Cutoff podeEditar={podeEditar} />
         : aba === 'pagamento' ? <FormasPagamento podeEditar={podeEditar} />
