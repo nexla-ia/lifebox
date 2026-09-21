@@ -205,3 +205,9 @@ export async function limparFixturePedido(marca: string, telefone: string) {
   await rest(`plans?name_pt=like.${encodeURIComponent(`%${marca}%`)}`,
              { method: 'DELETE', headers: { Prefer: 'return=minimal' } })
 }
+
+/** Remove a meta da semana criada por teste. */
+export async function limparMeta(isoCode: string) {
+  await rest(`goals?period_type=eq.week&period_key=eq.${encodeURIComponent(isoCode)}`,
+             { method: 'DELETE', headers: { Prefer: 'return=minimal' } })
+}

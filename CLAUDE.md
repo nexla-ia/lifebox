@@ -139,6 +139,19 @@ funciona.
 Ao apagar dado de teste, **apague pedidos antes do cliente**:
 `orders.customer_id` não tem `ON DELETE CASCADE` e o DELETE falha em silêncio.
 
+## Painel da Semana
+
+`v_week_summary` já aplica o §6.4: Total Pedidos = Novo + Renovação; Skip,
+Cancelamento e Parceria ficam fora; faturado conta só `confirmado`.
+
+**Embed de `sizes` precisa nomear a FK**: `orders` tem duas chaves para `sizes`
+(`size_id` e `breakfast_size_id`), e sem `sizes!orders_size_id_fkey(...)` o
+PostgREST recusa com "more than one relationship was found".
+
+Valores sem rótulo visível (Faturado, A receber) levam `aria-label` — melhora
+leitor de tela e evita que o teste tenha que caçar o rótulo pela estrutura do
+DOM.
+
 ## Telefone
 
 `src/lib/telefone.ts` normaliza para **E.164** — é o identificador que cruza

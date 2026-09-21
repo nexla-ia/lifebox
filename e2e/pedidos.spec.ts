@@ -85,9 +85,11 @@ test.describe('pedidos', () => {
       // faria o teste depender de estado global.
       await expect(page.getByText(/Pedido \w+-\d{4} criado/)).toBeVisible({ timeout: 20_000 })
 
-      const linha = page.getByRole('row').filter({ hasText: `Cliente ${marca}` })
-      await expect(linha).toContainText('novo_pedido')
-      await expect(linha).toContainText('$159.10')
+      // o pedido aparece no quadro por pagamento, classificado (§6.3)
+      const cartao = page.locator('section').filter({ hasText: 'Quadro por pagamento' })
+        .getByRole('listitem').filter({ hasText: `Cliente ${marca}` })
+      await expect(cartao).toContainText('Novo Pedido', { timeout: 20_000 })
+      await expect(cartao).toContainText('$159.10')
 
       // §6.4: Skip, Cancelamento e Parceria ficam fora; este conta
       await expect(page.getByText(/Total Pedidos/)).toBeVisible()
