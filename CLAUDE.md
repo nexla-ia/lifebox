@@ -85,6 +85,10 @@ configuração tem que renderizar `ConfigMissing`, não body vazio.
 
 `vercel.json` faz o rewrite de SPA; sem ele, atualizar em `/semana` dá 404.
 
+O e2e roda **serial** (`workers: 1`, `fullyParallel: false`): há um banco só,
+compartilhado por todos os specs. Um teste cria ZIP enquanto outro exige a
+lista vazia — em paralelo isso falha sem existir bug.
+
 Os testes que gravam no Supabase limpam em **hook `afterAll`**, nunca em
 `try/finally`: quando um teste estoura o timeout o Playwright aborta o corpo e
 o `finally` não chega a rodar, deixando lixo no banco da cliente. Marcam tudo
@@ -116,6 +120,20 @@ falha se sobrar algum nulo.
 Sinal para diagnosticar: se login com e-mail **inexistente** devolve 400
 `invalid_credentials` mas o e-mail real devolve 500, o schema está são e o
 problema é a linha daquele usuário.
+
+## Telefone
+
+`src/lib/telefone.ts` normaliza para **E.164** — é o identificador que cruza
+cliente e conversa do WhatsApp (§2). Errar aqui não dá erro visível: cria
+cliente duplicado e faz a automação do n8n não achar o pedido de quem mandou o
+comprovante.
+
+`normalizarTelefone` **recusa** o que é ambíguo (7 ou 9 dígitos, 11 sem começar
+em 1) em vez de chutar código de país. A planilha real tem `(781) 518-6457`,
+`774-239-8922` e `7819291049` na mesma coluna — todos viram `+17815186457`.
+
+Ao apagar cliente pela API REST nos testes, **encode o telefone**: o `+` vira
+espaço numa query string e o filtro não casa.
 
 ## ZIP codes
 

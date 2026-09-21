@@ -95,3 +95,45 @@ export async function limparPratos(marca: string) {
     },
   )
 }
+
+async function rest(caminho: string, init: RequestInit = {}) {
+  const c = await conectar()
+  if (!c) return null
+  return fetch(`${c.url}/rest/v1/${caminho}`, {
+    ...init,
+    headers: {
+      apikey: c.key,
+      Authorization: `Bearer ${c.token}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+      ...(init.headers ?? {}),
+    },
+  })
+}
+
+/** Cria um ZIP atendido para o teste, na primeira rota ativa. */
+export async function criarZipTeste(zip: string, city: string) {
+  const r = await rest('routes?select=id&active=eq.true&limit=1')
+  if (!r) return
+  const [rota] = (await r.json()) as { id: string }[]
+  await rest('zip_codes', {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates' },
+    body: JSON.stringify({ zip, city, state: 'MA', route_id: rota.id, active: true }),
+  })
+}
+
+export async function limparZip(zip: string) {
+  await rest(`zip_codes?zip=eq.${zip}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } })
+}
+
+/** Remove clientes do teste pelo telefone, que é a chave única. */
+export async function limparClientes(telefones: string[]) {
+  if (!telefones.length) return
+  // encodeURIComponent é obrigatório: o "+" do E.164 vira espaço numa query
+  // string, o filtro não casa e o cliente de teste fica no banco da cliente.
+  const lista = telefones.map((t) => encodeURIComponent(t)).join(',')
+  await rest(`customers?phone_e164=in.(${lista})`, {
+    method: 'DELETE', headers: { Prefer: 'return=minimal' },
+  })
+}
