@@ -1,0 +1,70 @@
+import { expect, test } from '@playwright/test'
+import { limparZips } from './supabaseTest'
+
+/** Importação de ZIPs por cidade. Ref: protótipo 9d.
+ *
+ *  A LifeBox sabe as cidades que atende, não os CEPs — este é o caminho que
+ *  transforma 27 nomes de cidade em ~84 ZIPs. Bate numa API pública de
+ *  verdade (api.zippopotam.us); se ela estiver fora, o teste falha e isso é
+ *  informação útil, não ruído. */
+
+const email = process.env.E2E_EMAIL
+const senha = process.env.E2E_SENHA
+
+// Medway tem poucos ZIPs — teste rápido e limpeza trivial
+const CIDADE = 'Medway'
+
+test.describe('ZIP codes', () => {
+  test.skip(!email || !senha, 'defina E2E_EMAIL e E2E_SENHA para rodar')
+
+  test('importa todos os ZIPs de uma cidade de uma vez', async ({ page }) => {
+    await page.goto('/')
+    await page.getByLabel('E-mail').fill(email!)
+    await page.getByLabel('Senha').fill(senha!)
+    await page.getByRole('button', { name: 'Entrar' }).click()
+    await page.waitForURL(/overview/, { timeout: 20_000 })
+
+    await page.getByRole('link', { name: /Configurações/ }).click()
+    await expect(page.getByRole('heading', { name: 'Configurações' })).toBeVisible()
+
+    let importados: string[] = []
+    try {
+      await page.getByLabel('Cidade (Massachusetts)').fill(CIDADE)
+      await page.getByRole('button', { name: 'Buscar ZIPs' }).click()
+
+      const previa = page.locator('section').filter({ hasText: 'Importar por cidade' })
+      await expect(previa.getByText(new RegExp(`ZIPs em ${CIDADE}`))).toBeVisible({ timeout: 15_000 })
+
+      await previa.getByRole('button', { name: /^Importar para/ }).click()
+
+      // a lista passa a contar os ZIPs — prova que gravou no banco
+      const lista = page.locator('section').filter({ hasText: 'ZIP codes atendidos' })
+      await expect(lista.getByText(new RegExp(`ZIP codes atendidos · [1-9]`))).toBeVisible({ timeout: 15_000 })
+      await expect(lista.getByText(CIDADE).first()).toBeVisible()
+
+      importados = await lista.locator('li strong').allInnerTexts()
+      expect(importados.length).toBeGreaterThan(0)
+
+      // persistiu? recarrega do banco
+      await page.reload()
+      await expect(
+        page.locator('section').filter({ hasText: 'ZIP codes atendidos' })
+          .getByText(CIDADE).first(),
+      ).toBeVisible({ timeout: 15_000 })
+    } finally {
+      await limparZips(importados)
+    }
+  })
+
+  test('lista vazia avisa que o link público recusa tudo', async ({ page }) => {
+    await page.goto('/')
+    await page.getByLabel('E-mail').fill(email!)
+    await page.getByLabel('Senha').fill(senha!)
+    await page.getByRole('button', { name: 'Entrar' }).click()
+    await page.waitForURL(/overview/, { timeout: 20_000 })
+    await page.goto('/config')
+
+    await expect(page.getByText('Nenhum ZIP cadastrado')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(/recusa todo pedido por estar fora da área/)).toBeVisible()
+  })
+})

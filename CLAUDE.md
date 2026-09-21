@@ -112,6 +112,22 @@ Sinal para diagnosticar: se login com e-mail **inexistente** devolve 400
 `invalid_credentials` mas o e-mail real devolve 500, o schema está são e o
 problema é a linha daquele usuário.
 
+## ZIP codes
+
+Duas coisas que NÃO podem se misturar:
+
+- **"que cidade é esse ZIP"** — conveniência. `src/lib/zip.ts` consulta
+  api.zippopotam.us (pública, sem chave). Pode falhar, pode estar fora do ar:
+  toda função devolve `null` em vez de lançar, e o formulário segue com a
+  pessoa digitando à mão.
+- **"nós entregamos nesse ZIP"** — regra de negócio (§6.1). Quem responde é
+  SEMPRE a tabela `zip_codes`. Nenhuma API externa decide se um pedido fecha.
+
+O caminho principal de cadastro é **por cidade**: a equipe sabe as cidades que
+atende, não os CEPs. `zipsDaCidade('Framingham')` traz os 5 ZIPs de uma vez —
+as 27 cidades da W37 rendem ~84 ZIPs. A rota segue editável por ZIP, porque não
+é estritamente geográfica (Ashland é South Shore).
+
 ## Preço na tela de Catálogo
 
 O campo canônico é o preço **base**, pré-tax; o final é derivado e mostrado ao

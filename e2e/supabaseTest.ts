@@ -68,3 +68,16 @@ export async function limparMarca(marca: string) {
     )
   }
 }
+
+/** Remove ZIPs específicos criados por um teste. */
+export async function limparZips(zips: string[]) {
+  const c = await conectar()
+  if (!c || zips.length === 0) return
+  await fetch(
+    `${c.url}/rest/v1/zip_codes?zip=in.(${zips.join(',')})`,
+    {
+      method: 'DELETE',
+      headers: { apikey: c.key, Authorization: `Bearer ${c.token}`, Prefer: 'return=minimal' },
+    },
+  )
+}

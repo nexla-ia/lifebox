@@ -21,9 +21,19 @@ cada um (Boston, Marlborough ou South Shore).
 pedido ou mostra "fora da área de entrega". Com a lista errada, o sistema
 recusa cliente bom.
 
-**Como estamos agora:** montamos uma lista provisória a partir das cidades que
-aparecem na planilha da W37 — 23 CEPs. Sabemos que está incompleta, e que pode
-ter CEP a mais: a planilha mostra só quem pediu naquela semana.
+**Ficou mais fácil:** vocês não precisam mais levantar CEP por CEP. Na tela de
+Configurações, basta digitar o **nome da cidade** e o sistema traz todos os CEPs
+dela de uma vez — Framingham, por exemplo, tem 5. Depois dá para trocar a rota
+de qualquer CEP individualmente, já que as rotas não são estritamente
+geográficas.
+
+Então o que precisamos de vocês é só a **lista de cidades** que atendem, e a
+rota de cada uma. As 27 cidades que aparecem na planilha da W37 renderiam
+cerca de 84 CEPs automaticamente.
+
+**Como estamos agora:** o ambiente está com a lista vazia, o que significa que
+o link público recusaria qualquer pedido. É o estado correto — melhor vazio do
+que com CEP errado —, mas precisa ser preenchido antes de ir ao ar.
 
 Cidades que apareceram na W37, por rota:
 

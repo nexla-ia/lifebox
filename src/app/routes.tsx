@@ -6,6 +6,7 @@ import { canAccess, SCREENS } from './screens'
 import { Login } from './pages/Login'
 import { EmDesenvolvimento } from './pages/EmDesenvolvimento'
 import { CatalogoPage } from '../features/catalogo/CatalogoPage'
+import { ConfigPage } from '../features/config/ConfigPage'
 
 /** O guarda é a segunda camada; quem manda de verdade é a RLS no Supabase
  *  (§3). Aqui só evitamos mostrar tela vazia para quem não deveria chegar. */
@@ -50,8 +51,8 @@ export function AppRoutes() {
             path={s.path}
             element={
               <Guard path={s.path}>
-                {s.path === '/catalogo'
-                  ? <CatalogoPage />
+                {s.path === '/catalogo' ? <CatalogoPage />
+                  : s.path === '/config' ? <ConfigPage />
                   : <EmDesenvolvimento screen={s} />}
               </Guard>
             }
