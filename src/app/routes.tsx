@@ -13,6 +13,7 @@ import { ProducaoPage } from '../features/producao/ProducaoPage'
 import { MontagemPage } from '../features/montagem/MontagemPage'
 import { BagsPage } from '../features/montagem/BagsPage'
 import { LinkPage } from '../features/link/LinkPage'
+import { ConvitePage } from '../features/convite/ConvitePage'
 
 /** O guarda é a segunda camada; quem manda de verdade é a RLS no Supabase
  *  (§3). Aqui só evitamos mostrar tela vazia para quem não deveria chegar. */
@@ -48,6 +49,10 @@ export function AppRoutes() {
           e não tem perfil. Quem protege é a RLS — o role anon só alcança as
           funções fn_link_* (migration 1400). */}
       <Route path="/pedido" element={<LinkPage />} />
+
+      {/* §3 · primeiro acesso: quem abre ainda não tem conta, então também
+          fica fora do guarda. O token é a única credencial (migration 1600). */}
+      <Route path="/convite/:token" element={<ConvitePage />} />
 
       <Route
         element={

@@ -4,6 +4,7 @@ import { Cutoff } from './Cutoff'
 import { FormasPagamento } from './FormasPagamento'
 import { Mensagens } from './Mensagens'
 import { Origens } from './Origens'
+import { Usuarios } from './Usuarios'
 import { ZipCodes } from './ZipCodes'
 
 /* Tela 9.8 · Configurações. Ref: protótipo 9d. Exclusiva do Administrador (§3).
@@ -60,6 +61,7 @@ export function ConfigPage() {
         : aba === 'cutoff' ? <Cutoff podeEditar={podeEditar} />
         : aba === 'pagamento' ? <FormasPagamento podeEditar={podeEditar} />
         : aba === 'mensagens' ? <Mensagens podeEditar={podeEditar} />
+        : aba === 'usuarios' ? <Usuarios podeEditar={podeEditar} />
         : (
           <div className="bg-surface border border-line rounded-xl p-10 text-center">
             <div className="text-3xl mb-2">🚧</div>

@@ -338,3 +338,18 @@ export async function limparFormas(marca: string) {
   await rest(`payment_methods?name_pt=like.${encodeURIComponent(`%${marca}%`)}`,
              { method: 'DELETE', headers: { Prefer: 'return=minimal' } })
 }
+
+/** Remove usuário de teste. Só funciona porque ele nunca lançou nada —
+ *  fn_remover_usuario recusa quem tem histórico, e é isso que queremos. */
+export async function removerUsuarioTeste(email: string) {
+  const c = await conectar()
+  if (!c) return
+  const r = await rest(`profiles?select=id&email=eq.${encodeURIComponent(email)}`)
+  const [p] = r ? ((await r.json()) as { id: string }[]) : []
+  if (!p) return
+  await fetch(`${c.url}/rest/v1/rpc/fn_remover_usuario`, {
+    method: 'POST',
+    headers: { apikey: c.key, Authorization: `Bearer ${c.token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_user: p.id }),
+  })
+}

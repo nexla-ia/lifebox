@@ -127,6 +127,17 @@ Primeiro Administrador (não tem quem o convide):
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1   -v email=... -v senha=... -v nome='...' -v papel=admin   -f supabase/tools/criar_usuario.sql
 ```
 
+**Convite é LINK, não e-mail** (`fn_convidar_usuario`): mandar e-mail exigiria
+SMTP no projeto, e a equipe se fala por WhatsApp. O Administrador copia o link
+e entrega. O que o §3 pede continua de pé — a pessoa define a própria senha,
+vale 7 dias, serve uma vez. O acesso fica fechado até lá porque
+`email_confirmed_at` é nulo e o GoTrue recusa o login; aceitar confirma o
+e-mail, e o gatilho `on_auth_user_confirmed` é quem vira o perfil para `ativo`.
+
+Quem nunca lançou nada sai por `fn_remover_usuario` — existe para o convite
+mandado ao e-mail errado, que senão ocupa o endereço para sempre. Quem tem
+histórico **não sai**: desativa, senão o pedido fica sem autor.
+
 **Armadilha, já paga:** `auth.users` tem quatro colunas sem DEFAULT —
 `confirmation_token`, `recovery_token`, `email_change_token_new` e
 `email_change`. O GoTrue as lê como string não-nula, então deixá-las NULL faz
@@ -319,6 +330,23 @@ de um pedido sempre vem do servidor (§2). `src/lib/precos.test.ts` prende os
 dois juntos nos casos do §5.1 e §5.6.
 
 ## Permissões (§3)
+
+**`is_admin()` e `is_staff()` devolvem `false`, nunca NULL.** `current_role_of()`
+é nulo para quem não tem perfil ativo, e `NULL = 'admin'` é NULL — que o plpgsql
+trata como falso em `if not is_admin() then raise`. O guard simplesmente não
+disparava. Em policy isso nunca apareceu (`using (NULL)` já barra), mas em
+função `security definer` o guard é a única barreira: sem ele, um chamador
+anônimo criava Administrador. Reproduzido antes do conserto, coberto em
+`usuarios_test.sql`.
+
+**Função nova no Postgres nasce com EXECUTE para PUBLIC.** `grant ... to
+authenticated` não fecha nada, só acrescenta. Toda função que escreve fora da
+RLS precisa de `revoke execute ... from public` antes do grant.
+
+**Trava de regra que a tela usa também tem de valer pela tabela.** A policy
+`profiles_admin_all` deixa o Administrador editar qualquer linha de `profiles`
+direto por PostgREST. Por isso "nunca ficar sem Administrador ativo" é
+**gatilho** (`sobra_um_admin`), não checagem dentro de `fn_definir_papel`.
 
 Três perfis, e a RLS é quem manda — o guarda de rota no front é só cortesia.
 

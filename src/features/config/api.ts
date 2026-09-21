@@ -138,3 +138,41 @@ export async function fetchTemplates() {
 export const salvarTemplate = (t: Template) =>
   supabase.from('message_templates')
     .upsert({ ...t, updated_at: new Date().toISOString() }, { onConflict: 'key,language' })
+
+// -------------------------------------------------------- usuários (9d, 9e)
+export type Usuario = {
+  id: string
+  full_name: string
+  email: string
+  role: 'admin' | 'operacao' | 'cozinha'
+  status: 'ativo' | 'convite_pendente' | 'desativado'
+  invited_at: string | null
+  created_at: string
+}
+
+export async function fetchUsuarios() {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, full_name, email, role, status, invited_at, created_at')
+    .order('full_name')
+  if (error) return { data: null, error: { message: error.message } }
+  return { error: null, data: (data ?? []) as Usuario[] }
+}
+
+/** Devolve o TOKEN, não manda e-mail: o convite é um link que o Administrador
+ *  entrega pelo WhatsApp. Mandar e-mail exigiria SMTP no projeto, e a regra do
+ *  §3 que importa — senha definida pela pessoa, expira em 7 dias, serve uma
+ *  vez — não depende do meio. */
+export const convidarUsuario = (email: string, nome: string, papel: Usuario['role']) =>
+  supabase.rpc('fn_convidar_usuario', { p_email: email, p_nome: nome, p_papel: papel })
+
+export const reenviarConvite = (id: string) =>
+  supabase.rpc('fn_reenviar_convite', { p_user: id })
+
+// Ambas por RPC, não por update na tabela: é lá que moram as travas de não
+// mexer em si mesmo e de não deixar o sistema sem Administrador (migration 1600).
+export const definirPapel = (id: string, papel: Usuario['role']) =>
+  supabase.rpc('fn_definir_papel', { p_user: id, p_papel: papel })
+
+export const definirStatus = (id: string, status: Usuario['status']) =>
+  supabase.rpc('fn_definir_status', { p_user: id, p_status: status })
