@@ -32,11 +32,19 @@ const AuthCtx = createContext<AuthValue | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
-  const [loading, setLoading] = useState(true)
+  // Enquanto a sessão do storage não foi lida, NÃO dá para dizer que a pessoa
+  // está deslogada. Sem isto, abrir /catalogo direto (ou dar F5) manda para o
+  // /login por um instante, e o destino original se perde: a pessoa reaparece
+  // na tela inicial do perfil em vez da que pediu.
+  const [booting, setBooting] = useState(true)
+  const [carregandoPerfil, setCarregandoPerfil] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session))
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session)
+      setBooting(false)
+    })
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s))
     return () => sub.subscription.unsubscribe()
   }, [])
@@ -44,11 +52,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!session) {
       setProfile(null)
-      setLoading(false)
+      setCarregandoPerfil(false)
       return
     }
     let cancelled = false
-    setLoading(true)
+    setCarregandoPerfil(true)
     supabase
       .from('profiles')
       .select('id, full_name, email, role, status')
@@ -65,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setProfile(data as Profile)
           setError(null)
         }
-        setLoading(false)
+        setCarregandoPerfil(false)
       })
     return () => {
       cancelled = true
@@ -78,7 +86,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthCtx.Provider value={{ session, profile, loading, error, signOut }}>
+    <AuthCtx.Provider
+      value={{ session, profile, loading: booting || carregandoPerfil, error, signOut }}
+    >
       {children}
     </AuthCtx.Provider>
   )

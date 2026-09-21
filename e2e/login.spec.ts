@@ -47,3 +47,36 @@ test.describe('login', () => {
     await expect(page.getByText('E-mail ou senha inválidos')).toBeVisible({ timeout: 15_000 })
   })
 })
+
+/* Regressão: antes, abrir uma rota profunda direto (ou dar F5 nela) mandava
+ * para o /login por um instante e o destino se perdia — a pessoa reaparecia na
+ * tela inicial do perfil. Causa: o AuthProvider dizia "deslogado" antes de
+ * terminar de ler a sessão do storage. */
+test.describe('link direto', () => {
+  test.skip(!email || !senha, 'defina E2E_EMAIL e E2E_SENHA para rodar')
+
+  test('deslogado, entra e cai na tela que pediu — não na inicial', async ({ page }) => {
+    await page.goto('/catalogo')
+    await page.getByLabel('E-mail').fill(email!)
+    await page.getByLabel('Senha').fill(senha!)
+    await page.getByRole('button', { name: 'Entrar' }).click()
+
+    await page.waitForURL(/\/catalogo$/, { timeout: 20_000 })
+    await expect(page.getByRole('heading', { name: 'Catálogo e menus' })).toBeVisible()
+  })
+
+  test('logado, F5 numa rota profunda continua nela', async ({ page }) => {
+    await page.goto('/')
+    await page.getByLabel('E-mail').fill(email!)
+    await page.getByLabel('Senha').fill(senha!)
+    await page.getByRole('button', { name: 'Entrar' }).click()
+    await page.waitForURL(/overview/, { timeout: 20_000 })
+
+    await page.getByRole('link', { name: /Catálogo/ }).click()
+    await page.waitForURL(/\/catalogo$/)
+
+    await page.reload()
+    await expect(page).toHaveURL(/\/catalogo$/)
+    await expect(page.getByRole('heading', { name: 'Catálogo e menus' })).toBeVisible()
+  })
+})

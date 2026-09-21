@@ -5,6 +5,7 @@ import { HOME_BY_ROLE, useAuth } from '../lib/auth'
 import { canAccess, SCREENS } from './screens'
 import { Login } from './pages/Login'
 import { EmDesenvolvimento } from './pages/EmDesenvolvimento'
+import { CatalogoPage } from '../features/catalogo/CatalogoPage'
 
 /** O guarda é a segunda camada; quem manda de verdade é a RLS no Supabase
  *  (§3). Aqui só evitamos mostrar tela vazia para quem não deveria chegar. */
@@ -49,7 +50,9 @@ export function AppRoutes() {
             path={s.path}
             element={
               <Guard path={s.path}>
-                <EmDesenvolvimento screen={s} />
+                {s.path === '/catalogo'
+                  ? <CatalogoPage />
+                  : <EmDesenvolvimento screen={s} />}
               </Guard>
             }
           />

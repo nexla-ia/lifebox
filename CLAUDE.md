@@ -112,6 +112,20 @@ Sinal para diagnosticar: se login com e-mail **inexistente** devolve 400
 `invalid_credentials` mas o e-mail real devolve 500, o schema está são e o
 problema é a linha daquele usuário.
 
+## Preço na tela de Catálogo
+
+O campo canônico é o preço **base**, pré-tax; o final é derivado e mostrado ao
+lado ao vivo (`src/lib/precos.ts`). Motivo: o final muda com o fulfillment
+(pick-up não cobra entrega) e com a taxa, então se a base fosse derivada do
+final, mexer nos 7% alteraria o preço de todos os planos em silêncio.
+
+`baseFromFinalCents` já faz o caminho inverso — se a LifeBox preferir digitar o
+preço de anúncio, só esta tela muda. Ver `docs/DECISOES-ABERTAS.md` item 4.
+
+`precos.ts` é **espelho de exibição** do `fn_price_order`, não a fonte: o total
+de um pedido sempre vem do servidor (§2). `src/lib/precos.test.ts` prende os
+dois juntos nos casos do §5.1 e §5.6.
+
 ## Permissões (§3)
 
 Três perfis, e a RLS é quem manda — o guarda de rota no front é só cortesia.

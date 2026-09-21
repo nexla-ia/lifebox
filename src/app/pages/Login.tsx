@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 
@@ -13,8 +13,12 @@ export function Login() {
   const [err, setErr] = useState<string | null>(null)
   const [sent, setSent] = useState(false)
   const [busy, setBusy] = useState(false)
+  const loc = useLocation()
 
-  if (session && profile) return <Navigate to="/" replace />
+  // quem chegou aqui por link direto volta para onde queria ir, não para a
+  // tela inicial do perfil
+  const destino = (loc.state as { from?: { pathname?: string } } | null)?.from?.pathname
+  if (session && profile) return <Navigate to={destino ?? '/'} replace />
 
   async function entrar(e: React.FormEvent) {
     e.preventDefault()
