@@ -57,10 +57,10 @@ case "${1:-}" in
     ;;
 
   test)
-    psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/tests/pricing_test.sql 2>&1 \
-      | grep -E 'NOTICE|ERROR|FALHOU' | sed 's/^psql:[^ ]* //; s/NOTICE:  //'
-    psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/tests/rls_test.sql 2>&1 \
-      | grep -E 'NOTICE|ERROR|FALHOU' | sed 's/^psql:[^ ]* //; s/NOTICE:  //'
+    for t in pricing semanas pedidos rls; do
+      psql "$DB_URL" -v ON_ERROR_STOP=1 -f "supabase/tests/${t}_test.sql" 2>&1 \
+        | grep -E 'NOTICE|ERROR|FALHOU' | sed 's/^psql:[^ ]* //; s/NOTICE:  //'
+    done
     ;;
 
   *)
