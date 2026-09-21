@@ -36,15 +36,29 @@ begin
 end $chk$;
 
 -- ============================================================ fixture
-insert into auth.users (id, email) values
-  ('11111111-1111-1111-1111-111111111111','admin@lifebox.test'),
-  ('22222222-2222-2222-2222-222222222222','operacao@lifebox.test'),
-  ('33333333-3333-3333-3333-333333333333','cozinha@lifebox.test');
+-- os perfis NÃO são inseridos à mão: quem cria é o gatilho
+-- on_auth_user_created, lendo full_name e role do metadata. Assim este teste
+-- também prova o provisionamento (migration 0700).
+insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values
+  ('11111111-1111-1111-1111-111111111111','admin@lifebox.test',    now(),
+   '{"full_name":"Admin Teste","role":"admin"}'::jsonb),
+  ('22222222-2222-2222-2222-222222222222','operacao@lifebox.test', now(),
+   '{"full_name":"Op Teste","role":"operacao"}'::jsonb),
+  ('33333333-3333-3333-3333-333333333333','cozinha@lifebox.test',  now(),
+   '{"full_name":"Cozinha Teste","role":"cozinha"}'::jsonb);
 
-insert into profiles (id, full_name, email, role, status) values
-  ('11111111-1111-1111-1111-111111111111','Admin Teste','admin@lifebox.test','admin','ativo'),
-  ('22222222-2222-2222-2222-222222222222','Op Teste','operacao@lifebox.test','operacao','ativo'),
-  ('33333333-3333-3333-3333-333333333333','Cozinha Teste','cozinha@lifebox.test','cozinha','ativo');
+do $t$
+begin
+  raise notice 'provisionamento pelo gatilho';
+  perform assert_eq((select count(*)::int from profiles
+                      where email like '%@lifebox.test'), 3, 'tres perfis criados');
+  perform assert_eq((select role from profiles
+                      where email = 'admin@lifebox.test'), 'admin'::user_role,
+                    'papel veio do metadata');
+  perform assert_eq((select status from profiles
+                      where email = 'cozinha@lifebox.test'), 'ativo'::user_status,
+                    'ja confirmado entra ativo');
+end $t$;
 
 do $fx$
 declare v_c uuid; v_w uuid; v_p uuid; v_s uuid; v_d uuid;

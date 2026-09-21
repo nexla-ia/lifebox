@@ -4,9 +4,18 @@
 
 create schema if not exists auth;
 
+-- Espelha as colunas de auth.users que o nosso código toca. NÃO é a tabela
+-- completa do Supabase — só o bastante para as migrations e os testes rodarem.
+-- Se uma migration passar a usar outra coluna, adicione aqui também, senão o
+-- cluster local diverge do Supabase e o erro só aparece no deploy.
 create table if not exists auth.users (
-  id    uuid primary key default gen_random_uuid(),
-  email text
+  id                 uuid primary key default gen_random_uuid(),
+  email              text,
+  email_confirmed_at timestamptz,
+  invited_at         timestamptz,
+  raw_user_meta_data jsonb not null default '{}'::jsonb,
+  raw_app_meta_data  jsonb not null default '{}'::jsonb,
+  created_at         timestamptz not null default now()
 );
 
 -- no Supabase vem do JWT; aqui vem de uma variável de sessão, para os testes
