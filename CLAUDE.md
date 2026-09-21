@@ -180,6 +180,38 @@ Valores sem rótulo visível (Faturado, A receber) levam `aria-label` — melhor
 leitor de tela e evita que o teste tenha que caçar o rótulo pela estrutura do
 DOM.
 
+## Link público (§9.7)
+
+A única rota sem login: `/pedido`, fora do `AppLayout` e sem guarda. Quem chega
+é o role `anon`, que passa apenas pelas funções `fn_link_*` da migration 1400 —
+uma porta só, e é nela que se audita o que sai. Dado novo na tela nasce lá,
+não numa consulta nova do front.
+
+Nos dois ambientes o anon é barrado de formas diferentes e as duas valem: no
+cluster local não há GRANT e vem `42501`; no Supabase o grant existe e quem
+barra é a RLS, devolvendo **vazio**. `link_test.sql` cobra o resultado — não
+sai dado — e exige RLS ligada em **toda** tabela de `public`: tabela nova sem
+RLS no Supabase nasce aberta para o anon.
+
+Tudo que a tela checa, o servidor checa de novo, porque a tela é do cliente:
+cutoff (§4), ZIP atendido (§6.1), formato do telefone e pedido duplicado na
+semana. Cada caso tem SQLSTATE próprio (`LB400`, `LB409`, `LB422`, `LB423`,
+`LB429`) para a tela dizer o que fazer em vez de um erro genérico.
+
+Rate limit: por **telefone** curto (6 consultas/10min, 3 pedidos/30min), por
+**IP** folgado (30 e 12). Quem varre cadastro troca de número, então quem barra
+é o IP — mas apertá-lo derruba cliente de verdade, que em rede de celular
+divide IP com muita gente.
+
+`name_snapshot` é sempre português, porque é o que a cozinha lê (§5.5). Na
+revisão do link o **rótulo** sai do catálogo no idioma da tela e só o **valor**
+vem do servidor — senão aparece "Plano 10+5" no meio de uma tela em inglês.
+
+**Armadilha, já paga:** `fn_semana_atual()` dentro do `WHERE` não roda quando
+`weeks` está vazia. Função volátil só é avaliada por linha varrida; sem linha,
+a semana nunca é criada. O link abriria em branco justamente na segunda de
+manhã, no primeiro acesso da semana. Chame para uma variável antes.
+
 ## Montagem e bags
 
 Marcar **Montado** e registrar o envio da bag são a mesma operação

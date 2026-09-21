@@ -12,6 +12,7 @@ import { SemanaPage } from '../features/pedidos/SemanaPage'
 import { ProducaoPage } from '../features/producao/ProducaoPage'
 import { MontagemPage } from '../features/montagem/MontagemPage'
 import { BagsPage } from '../features/montagem/BagsPage'
+import { LinkPage } from '../features/link/LinkPage'
 
 /** O guarda é a segunda camada; quem manda de verdade é a RLS no Supabase
  *  (§3). Aqui só evitamos mostrar tela vazia para quem não deveria chegar. */
@@ -42,6 +43,12 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+
+      {/* §9.7 · fora do AppLayout e sem guarda: quem abre o link não fez login
+          e não tem perfil. Quem protege é a RLS — o role anon só alcança as
+          funções fn_link_* (migration 1400). */}
+      <Route path="/pedido" element={<LinkPage />} />
+
       <Route
         element={
           <RequireSession>

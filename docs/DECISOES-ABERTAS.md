@@ -206,7 +206,9 @@ a mais no primeiro passo. Digam que entra.
 ## 13. Quantas vezes a mesma pessoa pode tentar pelo link
 
 **Como estamos agora:** por número de WhatsApp, **6 consultas de cadastro a
-cada 10 minutos** e **3 pedidos a cada 30 minutos**. Por IP, 12 e 6.
+cada 10 minutos** e **3 pedidos a cada 30 minutos**. Por conexão, 30 e 12 —
+mais folgado porque muita gente divide o mesmo IP na rede de celular, e um
+limite curto ali derrubaria cliente de verdade.
 
 O limite existe porque o link é aberto: sem ele, alguém poderia ficar testando
 números para descobrir quem é cliente de vocês. Os números acima são folgados

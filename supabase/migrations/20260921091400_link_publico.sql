@@ -232,7 +232,12 @@ begin
       using errcode = 'LB400';
   end if;
 
-  perform fn_link_guard('identificar', fn_link_ip(), 12, interval '10 minutes');
+  -- O limite por IP é folgado e o por TELEFONE é curto, de propósito. Quem
+  -- varre cadastro troca de número a cada tentativa, então quem barra isso é o
+  -- limite por IP — mas apertá-lo demais derruba cliente de verdade: rede de
+  -- celular põe muita gente atrás do mesmo IP (CGNAT), e uma família ou um
+  -- escritório inteiro chegam juntos.
+  perform fn_link_guard('identificar', fn_link_ip(), 30, interval '10 minutes');
   perform fn_link_guard('identificar', v_tel,         6, interval '10 minutes');
 
   select * into v_c from customers where phone_e164 = v_tel;
@@ -305,8 +310,8 @@ begin
     raise exception 'Nome é obrigatório.' using errcode = 'LB400';
   end if;
 
-  perform fn_link_guard('pedido', fn_link_ip(), 6, interval '30 minutes');
-  perform fn_link_guard('pedido', v_tel,        3, interval '30 minutes');
+  perform fn_link_guard('pedido', fn_link_ip(), 12, interval '30 minutes');
+  perform fn_link_guard('pedido', v_tel,         3, interval '30 minutes');
 
   v_w := fn_semana_atual();
   if fn_passou_cutoff(v_w) then

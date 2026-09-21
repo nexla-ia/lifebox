@@ -267,3 +267,31 @@ export async function setEstoqueBags(total: number) {
     headers: { Prefer: 'return=minimal' },
   })
 }
+
+/** Cliente que o LINK criou sozinho: o teste não sabe o id, só o telefone.
+ *  Pedido antes do cliente — orders.customer_id não tem ON DELETE CASCADE e
+ *  o DELETE do cliente falha em silêncio. */
+export async function limparPedidosECliente(telefone: string) {
+  const r = await rest(`customers?select=id&phone_e164=eq.${encodeURIComponent(telefone)}`)
+  const [cli] = r ? ((await r.json()) as { id: string }[]) : []
+  if (cli) {
+    await rest(`orders?customer_id=eq.${cli.id}`,
+               { method: 'DELETE', headers: { Prefer: 'return=minimal' } })
+  }
+  await limparClientes([telefone])
+}
+
+/** Adicional sem tax e sem delivery, como Suco e Detox (§5.4). Serve ao teste
+ *  do link: é o item que entra DEPOIS do delivery na revisão (tela 6i). */
+export async function criarAdicionalTeste(marca: string, precoCents: number) {
+  const r = await rest('addons', {
+    method: 'POST',
+    body: JSON.stringify({
+      name_pt: `Suco ${marca}`, name_en: `Juice ${marca}`,
+      price_cents: precoCents, charges_tax: false, charges_delivery: false,
+      requires_plan: false, active: true,
+    }),
+  })
+  const [a] = r ? ((await r.json()) as { id: string }[]) : []
+  return a?.id ?? null
+}
