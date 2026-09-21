@@ -14,6 +14,7 @@ import { MontagemPage } from '../features/montagem/MontagemPage'
 import { BagsPage } from '../features/montagem/BagsPage'
 import { LinkPage } from '../features/link/LinkPage'
 import { ConvitePage } from '../features/convite/ConvitePage'
+import { OverviewPage } from '../features/overview/OverviewPage'
 
 /** O guarda é a segunda camada; quem manda de verdade é a RLS no Supabase
  *  (§3). Aqui só evitamos mostrar tela vazia para quem não deveria chegar. */
@@ -68,7 +69,8 @@ export function AppRoutes() {
             path={s.path}
             element={
               <Guard path={s.path}>
-                {s.path === '/catalogo' ? <CatalogoPage />
+                {s.path === '/overview' ? <OverviewPage />
+                  : s.path === '/catalogo' ? <CatalogoPage />
                   : s.path === '/config' ? <ConfigPage />
                   : s.path === '/clientes' ? <ClientesPage />
                   : s.path === '/semana' ? <SemanaPage />

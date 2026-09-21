@@ -165,8 +165,12 @@ distintos. Na semana W38 do exemplo:
 | Valor total dos pedidos ÷ número de pedidos | $125.68 |
 | Valor já recebido ÷ pedidos pagos | $143.51 |
 
-**Como estamos agora:** ainda não implementado — essa tela é do Módulo 2. Dá
-para responder mais para a frente.
+**Como estamos agora:** o Overview usa **valor já recebido ÷ pedidos pagos**,
+que é a conta do documento do projeto. O card mostra a divisão embaixo do
+número ("$574.02 ÷ 4 pagos"), para não restar dúvida de qual é.
+
+A outra conta já sai calculada junto: se vocês preferirem, é uma linha de tela
+para trocar.
 
 ---
 
@@ -214,6 +218,21 @@ O limite existe porque o link é aberto: sem ele, alguém poderia ficar testando
 números para descobrir quem é cliente de vocês. Os números acima são folgados
 para uso normal — ninguém preenche três pedidos em meia hora sem querer. Se
 atrapalharem em alguma campanha, a gente afrouxa.
+
+---
+
+## 14. A semana pertence ao mês da entrega
+
+**Como estamos agora:** no Overview, uma semana entra no mês em que ela
+**entrega** — o domingo.
+
+Setembro de 2026, por exemplo, é W36 a W39: a W36 entrega dia 06/09 e a W40 já
+entrega em outubro. É o que faz a visão mensal fechar exatamente com a soma das
+semanas; contando por dia corrido, a semana virada de mês cairia metade em cada
+um e nenhum dos dois fecharia.
+
+Se vocês pensam o mês de outro jeito — por exemplo, pelo dia em que o pedido
+entrou — nos digam, porque muda os números do fechamento.
 
 ---
 

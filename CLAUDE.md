@@ -107,6 +107,14 @@ com sufixo `zzt-<timestamp>` para nunca colidir com o catálogo real.
 `supabase/tests/00_local_stub.sql` só existe porque o Postgres puro não tem o
 schema `auth` nem os roles `authenticated`/`anon`. **Não é migration.**
 
+**`useQuery` não apaga a tela ao recarregar.** `loading` é só a primeira carga
+e a troca de parâmetro; `reload()` depois de gravar devolve `refreshing` e
+mantém o conteúdo. Trocar tudo por esqueleto some com o formulário, perde o
+cursor e apaga a confirmação que acabou de aparecer — e quem guarda estado em
+`useEffect([valorSalvo])` ainda vê o efeito zerar o próprio aviso. Aconteceu
+duas vezes, em Mensagens e na meta do Overview: **efeito de formulário depende
+do REGISTRO aberto, não do valor gravado.**
+
 **Armadilha, já paga:** `getByRole('button', { name })` casa o nome por
 **substring**, não por igualdade. Em par de rótulo que só ganha prefixo —
 `Marcar X como montado` / `Desmarcar X como montado` — esperar o botão "voltar
@@ -194,6 +202,25 @@ PostgREST recusa com "more than one relationship was found".
 Valores sem rótulo visível (Faturado, A receber) levam `aria-label` — melhora
 leitor de tela e evita que o teste tenha que caçar o rótulo pela estrutura do
 DOM.
+
+## Overview (§10)
+
+**Semana é a unidade.** Mês e ano são conjuntos de semanas, e a semana entra no
+mês da **entrega** (o domingo, `ends_on`). É o que faz o §10 fechar — "a visão
+mensal precisa bater com a soma das semanas" — e o que o protótipo mostra
+(setembro/2026 = W36 a W39). Por dia corrido, a semana virada de mês cairia nos
+dois e nenhum fecharia. `overview_test.sql` prende isso.
+
+Tudo é derivado dos pedidos. O único número digitado na tela é a **meta**,
+porque é o único que ninguém consegue derivar.
+
+Ticket médio segue o `.md`: **faturado ÷ pedidos pagos**. O protótipo (8f) usa
+total ÷ pedidos e dá outro número — os dois saem de `fn_overview` com nomes
+diferentes, e o card mostra a divisão embaixo. Ver DECISOES-ABERTAS item 9.
+
+O bloco de leads fica zerado até o n8n alimentar `leads` (§9.1). A tela diz
+isso: `conversao` vem **NULL**, não 0 — sem denominador não há percentual, e
+"0%" se leria como desempenho ruim em vez de dado que não existe.
 
 ## Configurações (§9.8)
 
