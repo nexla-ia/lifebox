@@ -238,6 +238,66 @@ begin
   raise notice 'TELEFONE DO PEDIDO OK';
 end $tel$;
 
+-- ------------------------------ o numero como a Evolution entrega (sem o `+`)
+do $evo$
+declare
+  v_plan uuid; v_s uuid; v_d uuid; v_w uuid; v_c uuid; v_o uuid; r jsonb;
+begin
+  raise notice 'normalizar aceita o JID do WhatsApp e o que a equipe digita';
+  perform assert_eq(fn_telefone_normalizar('17744148199'),   '+17744148199', 'JID da Evolution');
+  perform assert_eq(fn_telefone_normalizar('+1 (774) 414-8199'), '+17744148199', 'como a tela mostra');
+  perform assert_eq(fn_telefone_normalizar('774-414-8199'),  '+17744148199', 'como a planilha tem');
+  perform assert_eq(fn_telefone_normalizar('5569992695898'), '+5569992695898', 'Brasil com o nono');
+  perform assert_eq(fn_telefone_normalizar('556992695898'),  '+556992695898',  'Brasil sem o nono');
+
+  raise notice 'e RECUSA o ambiguo em vez de chutar codigo de pais';
+  perform assert_eq(fn_telefone_normalizar('55123456789'), null, '11 digitos sem comecar em 1');
+  perform assert_eq(fn_telefone_normalizar('4148199'),     null, 'curto demais');
+  -- 10 digitos sao dos EUA mesmo comecando em 55: 551 e New Jersey
+  perform assert_eq(fn_telefone_normalizar('5514148199'),  '+15514148199', '10 digitos = EUA');
+
+  raise notice 'a chave casa o Brasil com e sem o nono digito';
+  perform assert_eq(fn_telefone_chave('+5569992695898'),
+                    fn_telefone_chave('+556992695898'), 'a mesma pessoa');
+  perform assert_eq(fn_telefone_chave('+17744148199') = fn_telefone_chave('+17744148100'),
+                    false, 'numeros diferentes continuam diferentes');
+
+  select id into v_plan from plans  where name_en = 'PLAN CMP';
+  select id into v_s    from sizes  where code = 'S';
+  select id into v_d    from dishes where name_en = 'Dish cmp';
+  v_w := fn_semana_atual();
+
+  raise notice 'o pedido feito com +55 e achado pelo que a Evolution manda';
+  -- Numero de teste do Brasil NAO se inventa parecido com um de verdade: os
+  -- +1555… daqui usam o prefixo ficticio dos EUA, e o Brasil nao tem faixa
+  -- reservada. Este teste ja estourou `customers_phone_e164_key` contra o
+  -- banco da cliente, onde o numero escolhido era de um cliente real.
+  insert into customers (first_name, phone_e164, status)
+    values ('Veio do Brasil', '+5569988880001', 'ativo') returning id into v_c;
+  r := fn_create_order(jsonb_build_object(
+    'customer_id', v_c, 'week_id', v_w, 'kind','plan','plan_id',v_plan,'size_id',v_s,
+    'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_d,'qty',5))));
+  v_o := (r->>'order_id')::uuid;
+
+  -- o WhatsApp devolve o JID ora com o nono digito, ora sem — e as duas formas
+  -- tem de achar o mesmo pedido, senao a automacao falha uma semana sim e
+  -- outra nao, sem dar erro nenhum
+  perform assert_eq((fn_pedidos_do_telefone('5569988880001')->'pedidos'->0->>'order_id'),
+                    v_o::text, 'JID com o nono digito');
+  perform assert_eq((fn_pedidos_do_telefone('556988880001')->'pedidos'->0->>'order_id'),
+                    v_o::text, 'JID SEM o nono digito acha o mesmo pedido');
+
+  r := fn_registrar_comprovante(jsonb_build_object(
+    'phone','556988880001', 'valor_cents',
+    (select total_cents from orders where id = v_o),
+    'storage_path','comprovantes/j.jpg',
+    'destinatario','pagamentos@lifebox.test',
+    'transaction_id','TX-005', 'confianca', 0.99));
+  perform assert_eq(r->>'order_id', v_o::text, 'e o comprovante cai nele');
+
+  raise notice 'EVOLUTION OK';
+end $evo$;
+
 -- ----------------------------------------------------- comprovante e dinheiro
 do $seg$
 begin

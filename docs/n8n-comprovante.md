@@ -65,6 +65,11 @@ GET {SUPABASE_URL}/rest/v1/orders
 
 O `+` vai como `%2B`: numa query string o `+` vira espaço e o filtro não casa.
 
+A Evolution entrega o número **sem** o `+` (`17744148199@s.whatsapp.net`), então
+para a consulta REST direta o fluxo precisa recolocá-lo. Se não quiser fazer
+isso no n8n, use a RPC abaixo — ela aceita o número do jeito que a Evolution
+manda.
+
 No nó Supabase do n8n é *Row › Get*, tabela `orders`, duas condições:
 `phone_e164` e `payment_status`.
 
@@ -77,8 +82,18 @@ POST  {SUPABASE_URL}/rest/v1/rpc/fn_pedidos_do_telefone
       Authorization: Bearer {SERVICE_ROLE_KEY}
       Content-Type: application/json
 
-{ "p_phone": "+5569992695898" }
+{ "p_phone": "17744148199" }
 ```
+
+`p_phone` aceita o que chegar: `17744148199` (JID), `+1 (774) 414-8199`,
+`774-414-8199` ou `+17744148199`. O que for ambíguo é **recusado** com `LB400`
+em vez de virar um número chutado — 10 dígitos são dos EUA mesmo começando em
+55, porque 551 é código de área de New Jersey.
+
+**E o nono dígito do Brasil não atrapalha.** O WhatsApp devolve o JID ora com
+ele, ora sem: `5569992695898` e `556992695898` são a mesma pessoa. A busca casa
+os dois — sem isso a automação acharia o pedido numa semana e não na outra, sem
+dar erro nenhum. O mesmo vale no `phone` de `fn_registrar_comprovante`.
 
 Resposta:
 
