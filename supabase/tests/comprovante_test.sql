@@ -187,6 +187,57 @@ begin
   raise notice 'DOIS PEDIDOS OK';
 end $dois$;
 
+-- ------------------------------------- o numero e do PEDIDO, nao do cadastro
+do $tel$
+declare
+  v_plan uuid; v_s uuid; v_d uuid; v_w uuid; v_c uuid; v_o uuid; r jsonb;
+begin
+  select id into v_plan from plans  where name_en = 'PLAN CMP';
+  select id into v_s    from sizes  where code = 'S';
+  select id into v_d    from dishes where name_en = 'Dish cmp';
+  v_w := fn_semana_atual();
+
+  insert into customers (first_name, phone_e164, status)
+    values ('Trocou Numero', '+15552220003', 'ativo') returning id into v_c;
+  r := fn_create_order(jsonb_build_object(
+    'customer_id', v_c, 'week_id', v_w, 'kind','plan','plan_id',v_plan,'size_id',v_s,
+    'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_d,'qty',5))));
+  v_o := (r->>'order_id')::uuid;
+
+  perform assert_eq((select phone_e164 from orders where id = v_o), '+15552220003',
+                    'o pedido nasce com o numero usado nele');
+
+  raise notice 'e a consulta do n8n e uma so: numero + status';
+  perform assert_eq((select count(*)::int from orders
+                      where phone_e164 = '+15552220003'
+                        and payment_status = 'aguardando_pagamento'), 1,
+                    'acha o pedido a receber sem join');
+
+  raise notice 'o cliente troca de numero e o pedido NAO muda (§9.3)';
+  -- e o caso que derruba procurar por customers: o comprovante chega pelo
+  -- numero antigo, que e para onde a confirmacao foi
+  update customers set phone_e164 = '+15552220099' where id = v_c;
+
+  perform assert_eq((select phone_e164 from orders where id = v_o), '+15552220003',
+                    'pedido continua com o numero de quando foi feito');
+  perform assert_eq(jsonb_array_length(
+                      fn_pedidos_do_telefone('+15552220003')->'pedidos'), 1,
+                    'o numero antigo ainda acha o pedido');
+  perform assert_eq(jsonb_array_length(
+                      fn_pedidos_do_telefone('+15552220099')->'pedidos'), 0,
+                    'o numero novo nao tem pedido nenhum ainda');
+
+  r := fn_registrar_comprovante(jsonb_build_object(
+    'phone','+15552220003', 'valor_cents',
+    (select total_cents from orders where id = v_o),
+    'storage_path','comprovantes/i.jpg',
+    'destinatario','pagamentos@lifebox.test',
+    'transaction_id','TX-004', 'confianca', 0.99));
+  perform assert_eq(r->>'order_id', v_o::text, 'o comprovante caiu no pedido certo');
+
+  raise notice 'TELEFONE DO PEDIDO OK';
+end $tel$;
+
 -- ----------------------------------------------------- comprovante e dinheiro
 do $seg$
 begin

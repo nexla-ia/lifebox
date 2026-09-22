@@ -14,10 +14,14 @@ ninguém cobra. Por isso as regras ficam no banco, não no fluxo do n8n.
 
 **Onde fica o pedido:** tabela `orders`.
 
-**Onde fica o telefone:** **não** está em `orders`. Ele mora em
-`customers.phone_e164`, em E.164 (`+15085550164`, `+5569992695898`) — é a chave
-que cruza cliente e conversa do WhatsApp (§2). O pedido chega no cliente por
-`orders.customer_id`.
+**Onde fica o telefone:** `orders.phone_e164`, em E.164 (`+15085550164`,
+`+5569992695898`). É **snapshot**: o número para onde a confirmação daquele
+pedido foi, e por onde o comprovante volta.
+
+`customers.phone_e164` continua existindo e é a chave do cliente (§2), mas não
+é por ele que se procura. Quem trocar de número em novembro tem o cadastro
+novo e o comprovante de setembro chegando pelo antigo — o pedido guarda o
+antigo, que é o que bate.
 
 **Os status de pagamento** (`orders.payment_status`):
 
@@ -50,6 +54,23 @@ O caminho é uma função, que faz tudo numa transação só.
 
 ## 1) Achar o pedido pelo número
 
+Uma consulta só, sem join — é o índice `orders_phone_status_idx`:
+
+```
+GET {SUPABASE_URL}/rest/v1/orders
+    ?phone_e164=eq.%2B5569992695898
+    &payment_status=eq.aguardando_pagamento
+    &select=id,code,total_cents,paid_amount_cents,created_at
+```
+
+O `+` vai como `%2B`: numa query string o `+` vira espaço e o filtro não casa.
+
+No nó Supabase do n8n é *Row › Get*, tabela `orders`, duas condições:
+`phone_e164` e `payment_status`.
+
+Se preferir já mastigado — com a semana corrente filtrada e o `em_aberto_cents`
+calculado:
+
 ```
 POST  {SUPABASE_URL}/rest/v1/rpc/fn_pedidos_do_telefone
       apikey: {SERVICE_ROLE_KEY}
@@ -75,8 +96,14 @@ Resposta:
 }
 ```
 
-`pedidos` é **lista** e traz só a semana corrente. Número fora do cadastro
-devolve `encontrado: false` com a lista vazia — não é erro.
+`pedidos` é **lista** e traz só a semana corrente. Número sem pedido devolve a
+lista vazia — não é erro.
+
+Atenção ao status: o filtro por `aguardando_pagamento` acha quem ainda não
+mandou nada. Quem já mandou um comprovante que caiu na fila está em
+`comprovante_recebido`, e um segundo envio do mesmo cliente não apareceria
+nesse filtro. Para o cruzamento use `payment_status=neq.confirmado`, ou a RPC,
+que já traz `aberto: true/false`.
 
 ## 2) Registrar o comprovante
 
