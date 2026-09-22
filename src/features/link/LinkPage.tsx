@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { money } from '../../lib/supabase'
 import { useQuery } from '../../lib/useQuery'
 import { ErrorState, Loading } from '../../ui/states'
 import {
@@ -43,7 +44,7 @@ export function LinkPage() {
   const [escolha, setEscolha] = useState<Escolha>({ kind: 'plan', plan_id: null, size_id: null })
   const [pratos, setPratos] = useState<MapaQtd>({})
   const [addons, setAddons] = useState<MapaQtd>({})
-  const [pedidoExistente, setPedidoExistente] = useState<Identificacao['pedido']>(null)
+  const [jaTemPedido, setJaTemPedido] = useState<NonNullable<Identificacao['pedidos']>>([])
   const [confirmando, setConfirmando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [pronto, setPronto] = useState<{
@@ -140,15 +141,21 @@ export function LinkPage() {
           {' · 🚚 '}{t.entregaDomingo} {dataCurta(s.entrega, lang)}
         </>
       )}>
-      {/* tela 6m · o número já tem pedido nesta semana */}
-      {pedidoExistente && passo === 'identificacao' && (
+      {/* tela 6m · já tem pedido nesta semana. Não bloqueia: mostra o que
+          existe e deixa fazer outro, separado (reunião de 22/09/2026). */}
+      {jaTemPedido.length > 0 && passo === 'identificacao' && (
         <Aviso tom="warn">
           ✋ <strong>{t.jaTemPedido}</strong>
-          <div className="mt-1">
-            #{pedidoExistente.code}
-            {pedidoExistente.plano && ` · ${pedidoExistente.plano}`}
-            {pedidoExistente.tamanho && ` · ${pedidoExistente.tamanho}`}
-          </div>
+          <ul className="mt-1">
+            {jaTemPedido.map((o) => (
+              <li key={o.code}>
+                #{o.code}
+                {o.plano && ` · ${o.plano}`}
+                {o.tamanho && ` · ${o.tamanho}`}
+                {' · '}{money(o.total_cents)}
+              </li>
+            ))}
+          </ul>
           <div className="mt-1">{t.jaTemPedidoAjuda}</div>
         </Aviso>
       )}
@@ -156,8 +163,9 @@ export function LinkPage() {
       {passo === 'identificacao' && (
         <PassoIdentificacao
           t={t} lang={lang} catalogo={cat} dados={dados}
-          setDados={(d) => { setDados(d); setPedidoExistente(null) }}
-          onPedidoExistente={setPedidoExistente}
+          setDados={setDados}
+          onPedidoExistente={setJaTemPedido}
+          jaTemPedido={jaTemPedido.length > 0}
           onAvancar={() => setPasso('plano')} />
       )}
 

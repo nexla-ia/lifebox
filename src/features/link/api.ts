@@ -87,7 +87,9 @@ export type Identificacao = {
   delivery_notes?: string | null
   default_plan_id?: string | null
   default_size_id?: string | null
-  pedido?: { code: string; total_cents: number; plano: string | null; tamanho: string | null } | null
+  /** Pedidos que a pessoa já tem NESTA semana. Pode ter mais de um desde a
+   *  reunião de 22/09/2026: quem volta ao link faz um pedido separado. */
+  pedidos?: { code: string; total_cents: number; plano: string | null; tamanho: string | null }[]
 }
 
 export type ItemPedido =

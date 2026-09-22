@@ -46,15 +46,16 @@ type EstadoZip =
   | { estado: 'fora' }
 
 export function PassoIdentificacao({
-  t, lang, catalogo, dados, setDados, onAvancar, onPedidoExistente,
+  t, lang, catalogo, dados, setDados, onAvancar, onPedidoExistente, jaTemPedido,
 }: {
   t: Textos
   lang: Idioma
   catalogo: CatalogoLink
   dados: DadosCliente
   setDados: (d: DadosCliente) => void
+  jaTemPedido: boolean
   onAvancar: () => void
-  onPedidoExistente: (p: NonNullable<Identificacao['pedido']>) => void
+  onPedidoExistente: (p: NonNullable<Identificacao['pedidos']>) => void
 }) {
   const [bruto, setBruto] = useState(dados.telefone ? formatarTelefone(dados.telefone) : '')
   const [buscando, setBuscando] = useState(false)
@@ -89,7 +90,9 @@ export function PassoIdentificacao({
         setErroTel(error?.code === 'LB429' ? t.erroLimite : t.erroGenerico)
         return
       }
-      if (data.pedido) { onPedidoExistente(data.pedido); return }
+      // ter pedido na semana não interrompe mais o fluxo: a tela mostra o que
+      // já existe e a pessoa decide fazer outro (reunião de 22/09/2026)
+      onPedidoExistente(data.pedidos ?? [])
 
       if (data.conhecido) {
         setDados({
@@ -247,7 +250,7 @@ export function PassoIdentificacao({
       )}
 
       <BotaoPrincipal onClick={onAvancar} disabled={!podeAvancar}>
-        {t.escolherPlano}
+        {jaTemPedido ? t.outroPedido : t.escolherPlano}
       </BotaoPrincipal>
     </div>
   )

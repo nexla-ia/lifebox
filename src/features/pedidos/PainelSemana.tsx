@@ -124,7 +124,8 @@ function Cards({
     return c
   }, [dados.linhas])
 
-  const ativos = r.total_pedidos + r.aguardando_selecao
+  // clientes, não pedidos: é quantas PESSOAS responderam à semana
+  const ativos = r.clientes_com_pedido + r.aguardando_selecao
 
   return (
     <div className="grid md:grid-cols-3 xl:grid-cols-5 gap-2.5">
@@ -167,12 +168,17 @@ function Cards({
 
       <Card titulo="Total Pedidos" valor={String(r.total_pedidos)}
         detalhe={`✅ ${r.novo_pedido} Novo · 🔁 ${r.renovacao} Renovação`}
-        nota="conta na semana do pedido, mesmo sem pagamento" />
+        nota={r.total_pedidos !== r.clientes_com_pedido
+          // Novo e Renovação contam PESSOAS; o total conta PEDIDOS. Quando
+          // alguém pede duas vezes os números deixam de bater, e o certo é
+          // dizer por quê em vez de deixar a equipe achando que errou a conta
+          ? `de ${r.clientes_com_pedido} clientes — alguém pediu mais de uma vez`
+          : 'conta na semana do pedido, mesmo sem pagamento'} />
 
       <Card titulo="Seleção"
         valor={`${r.aguardando_selecao}`} valorSufixo="aguardando"
         detalhe={ativos > 0
-          ? `${r.total_pedidos} de ${ativos} clientes responderam`
+          ? `${r.clientes_com_pedido} de ${ativos} clientes responderam`
           : 'nenhum cliente na semana ainda'}
         tom={r.aguardando_selecao > 0 ? 'warn' : undefined} />
 

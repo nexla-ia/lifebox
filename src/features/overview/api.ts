@@ -27,7 +27,9 @@ export type Overview = {
     pct_meta: number | null
   }
   pedidos: {
-    total: number; novo: number; renovacao: number
+    /** conta PEDIDOS. `clientes` conta PESSOAS — divergem quando alguém pede
+     *  duas vezes na semana (reunião de 22/09/2026) */
+    total: number; clientes: number; novo: number; renovacao: number
     skip: number; cancelamento: number; parceria: number
     aguardando_selecao: number
   }

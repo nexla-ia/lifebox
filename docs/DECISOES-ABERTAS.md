@@ -254,6 +254,24 @@ formato dele, senão o sistema grava número que não existe.
 
 ---
 
+## 16. Total Pedidos conta pedidos; Novo e Renovação contam pessoas
+
+**Como estamos agora:** desde que o mesmo cliente pode ter mais de um pedido na
+semana, os dois números deixaram de ser a mesma coisa.
+
+- **Total Pedidos** conta **pedidos**.
+- **Novo Pedido** e **Renovação** contam **pessoas** — quem pede duas vezes
+  continua sendo uma pessoa nova, não duas.
+
+Quando alguém pede duas vezes, a tela mostra "8 pedidos, de 7 clientes". Não é
+erro de conta: são duas perguntas diferentes, e as duas importam. O dinheiro
+soma os dois pedidos, sempre.
+
+Se vocês preferirem que Total Pedidos conte clientes, é uma linha — mas aí o
+número deixa de bater com a quantidade de sacolas que sai no domingo.
+
+---
+
 ## Sobre o catálogo
 
 Pratos, planos, preços, adicionais, formas de pagamento e origens **não vêm

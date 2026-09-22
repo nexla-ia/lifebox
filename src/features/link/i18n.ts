@@ -50,8 +50,9 @@ export const T = {
 
     // tela 6m
     jaTemPedido: 'You already have an order this week',
-    jaTemPedidoAjuda: 'You can review or change it until the cutoff.',
+    jaTemPedidoAjuda: 'You can place another one — it goes as a separate order.',
     verPedido: 'View order',
+    outroPedido: 'Place another order',
 
     // passo 2 · telas 6a, 6c
     p2Titulo: 'Choose your plan',
@@ -161,8 +162,9 @@ export const T = {
     verificando: 'Conferindo…',
 
     jaTemPedido: 'Você já tem um pedido nesta semana',
-    jaTemPedidoAjuda: 'Dá para ver ou alterar até o cutoff.',
+    jaTemPedidoAjuda: 'Dá para fazer outro — ele entra como um pedido separado.',
     verPedido: 'Ver pedido',
+    outroPedido: 'Fazer outro pedido',
 
     p2Titulo: 'Escolha seu plano',
     refeicoes: 'refeições',

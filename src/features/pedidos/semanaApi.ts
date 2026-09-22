@@ -21,6 +21,10 @@ export type ResumoSemana = {
   follow_up: number
   aguardando_selecao: number
   total_pedidos: number
+  /** Total Pedidos conta PEDIDOS; Novo e Renovação contam PESSOAS. Os dois
+   *  divergem quando alguém pede duas vezes na semana, o que passou a ser
+   *  permitido (reunião de 22/09/2026). */
+  clientes_com_pedido: number
   pedidos_cents: number
   faturado_cents: number
   a_receber_cents: number

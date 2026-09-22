@@ -197,6 +197,22 @@ no do servidor. Cuidado — `fn_passou_cutoff` é STABLE e enxerga o snapshot do
 início do statement, então criar a semana e consultá-la na mesma linha não
 funciona.
 
+**O mesmo cliente pode ter mais de um pedido na semana** (reunião de
+22/09/2026). Isso derrubou a trava do §6.1 e, junto com ela, um jeito de contar:
+`v_week_summary` somava dinheiro atravessando `customer_weeks.order_id`, que
+aponta para um pedido só — o segundo sumiria do faturamento sem dar erro. Agora
+o dinheiro vem de `orders` direto.
+
+`customer_weeks` continua com **uma linha por pessoa por semana**: é o status
+dela (Novo, Renovação, Skip), não do pedido. Daí a consequência que a tela tem
+de dizer: **Total Pedidos conta PEDIDOS, Novo e Renovação contam PESSOAS.**
+Quando divergem, a tela mostra "de N clientes" em vez de deixar parecer erro de
+conta. Desvio consciente do §6.4, em DECISOES-ABERTAS item 16.
+
+A trava de verdade era `unique (customer_id, week_id)` em `orders` — a função
+só levantava a mensagem bonita depois. Regra que existe em dois lugares sai dos
+dois.
+
 Ao apagar dado de teste, **apague pedidos antes do cliente**:
 `orders.customer_id` não tem `ON DELETE CASCADE` e o DELETE falha em silêncio.
 

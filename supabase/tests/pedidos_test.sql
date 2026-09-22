@@ -84,15 +84,35 @@ begin
   perform assert_eq((select status from customers where id = v_c),
                     'ativo'::customer_status, 'virou ativo');
 
-  raise notice 'um pedido por cliente por semana';
-  begin
-    perform fn_create_order(jsonb_build_object(
+  raise notice 'o mesmo cliente pode ter mais de um pedido na semana';
+  -- reuniao de 22/09/2026: a pessoa volta ao link e faz um pedido SEPARADO.
+  -- O risco nao e o segundo pedido existir, e ele sumir do dinheiro: a versao
+  -- anterior de v_week_summary somava atravessando customer_weeks.order_id,
+  -- que aponta para um pedido so.
+  declare v_total_antes int; v_pedidos_antes int; r2 jsonb; begin
+    select pedidos_cents, total_pedidos into v_total_antes, v_pedidos_antes
+      from v_week_summary where week_id = v_w;
+
+    r2 := fn_create_order(jsonb_build_object(
       'customer_id', v_c, 'week_id', v_w, 'kind', 'plan',
-      'plan_id', v_plan, 'size_id', v_s, 'items', '[]'::jsonb));
-    raise exception 'FALHOU: aceitou segundo pedido na mesma semana';
-  exception when others then
-    if position('ja tem pedido nesta semana' in sqlerrm) = 0 then raise; end if;
-    raise notice '  ok  recusado: %', sqlerrm;
+      'plan_id', v_plan, 'size_id', v_s,
+      'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_meal,'qty',10))));
+    perform assert_eq(r2->>'code' is not null, true, 'segundo pedido criado');
+    perform assert_eq((select count(*)::int from orders
+                        where customer_id = v_c and week_id = v_w), 2, 'dois pedidos');
+
+    perform assert_eq((select total_pedidos::int from v_week_summary where week_id = v_w),
+                      v_pedidos_antes + 1, 'Total Pedidos conta os DOIS');
+    perform assert_eq((select pedidos_cents from v_week_summary where week_id = v_w)
+                        > v_total_antes,
+                      true, 'o dinheiro do segundo entra no faturamento');
+
+    -- status e da PESSOA: quem pede duas vezes nao fica duas vezes Novo
+    perform assert_eq((select count(*)::int from customer_weeks
+                        where customer_id = v_c and week_id = v_w), 1,
+                      'uma linha de status por pessoa');
+    perform assert_eq((select clientes_com_pedido::int from v_week_summary
+                        where week_id = v_w), 1, 'um cliente, dois pedidos');
   end;
 
   raise notice 'semana seguinte vira Renovacao';

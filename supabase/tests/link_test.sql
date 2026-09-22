@@ -233,21 +233,20 @@ begin
   perform assert_eq(fn_notificar_pedido(
     (select id from orders where customer_id = v_cli), 'pt'), null, 'saiu calado');
 
-  raise notice 'segundo pedido na mesma semana vira estado, nao duplicata (tela 6m)';
-  begin
-    perform fn_link_criar_pedido(jsonb_build_object(
-      'phone','+15550100003','first_name','Cliente Link','zip_code','02118',
-      'kind','plan','plan_id',v_plan,'size_id',v_s,
-      'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_d,'qty',5))));
-    raise exception 'FALHOU: criou dois pedidos do mesmo cliente na semana';
-  exception when sqlstate 'LB409' then
-    raise notice '  ok  recusa segundo pedido na semana';
-  end;
+  raise notice 'quem volta ao link faz um segundo pedido (tela 6m)';
+  perform fn_link_criar_pedido(jsonb_build_object(
+    'phone','+15550100003','first_name','Cliente Link','zip_code','02118',
+    'kind','plan','plan_id',v_plan,'size_id',v_s,
+    'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_d,'qty',5))));
+  perform assert_eq((select count(*)::int from orders where customer_id = v_cli),
+                    2, 'dois pedidos do mesmo cliente');
 
   r := fn_link_identificar('+15550100003');
   perform assert_eq((r->>'conhecido')::boolean, true, 'numero reconhecido');
   perform assert_eq(r->>'first_name', 'Cliente Link', 'nome para o "Ola, {nome}"');
-  perform assert_eq(r->'pedido'->>'code' is not null, true, 'tela 6m sabe do pedido da semana');
+  -- a tela 6m mostra o que JA existe antes de a pessoa decidir fazer outro
+  perform assert_eq(jsonb_array_length(r->'pedidos'), 2,
+                    'a tela lista os dois pedidos da semana');
 
   raise notice 'ZIP fora da area bloqueia o pedido (tela 6f)';
   begin

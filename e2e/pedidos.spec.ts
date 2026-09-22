@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import './env'
-import { criarFixturePedido, limparFixturePedido } from './supabaseTest'
+import { criarFixturePedido, lerOverviewSemana, limparFixturePedido } from './supabaseTest'
 
 /** Pedido ponta a ponta: monta na tela e confere o total.
  *
@@ -13,12 +13,17 @@ const senha = process.env.E2E_SENHA
 const marca = Date.now().toString().slice(-6)
 
 let fx: Awaited<ReturnType<typeof criarFixturePedido>> = null
+// a semana é da cliente e já tem pedido dela: mede-se a diferença
+let antes = { total_cents: 0, pedidos: 0 }
 
 test.describe('pedidos', () => {
   test.describe.configure({ mode: 'serial' })
   test.skip(!email || !senha, 'defina E2E_EMAIL e E2E_SENHA para rodar')
 
-  test.beforeAll(async () => { fx = await criarFixturePedido(marca) })
+  test.beforeAll(async () => {
+    antes = await lerOverviewSemana()
+    fx = await criarFixturePedido(marca)
+  })
   test.afterAll(async () => {
     if (fx) await limparFixturePedido(marca, fx.telefone)
   })
@@ -96,13 +101,29 @@ test.describe('pedidos', () => {
       await expect(page.getByText(/Total Pedidos/)).toBeVisible()
     })
 
-  test('recusa segundo pedido do mesmo cliente na mesma semana', async ({ page }) => {
+  // Reunião de 22/09/2026: o mesmo cliente pode ter mais de um pedido na
+  // semana — pedir para si e depois para alguém da casa é o caso real. O que
+  // importa provar é que o segundo NÃO some do dinheiro: a versão anterior do
+  // resumo somava atravessando customer_weeks.order_id, que aponta para um só.
+  test('segundo pedido do mesmo cliente entra, e o dinheiro dos dois aparece', async ({ page }) => {
     await abrirFicha(page)
     await montarPlano(page, 10)
     await expect(totalNoResumo(page)).toHaveText('$147.60', { timeout: 20_000 })
     await page.getByRole('button', { name: /Salvar pedido/ }).click()
+    await expect(page.getByText(/Pedido \w+-\d{4} criado/)).toBeVisible({ timeout: 20_000 })
 
-    await expect(page.getByRole('alert'))
-      .toContainText(/ja tem pedido nesta semana/i, { timeout: 20_000 })
+    // o card conta PEDIDOS; o rodapé diz de quantos CLIENTES, para o número
+    // não parecer erro de conta. Os dois pedidos deste spec são do MESMO
+    // cliente: +2 pedidos, +1 cliente.
+    const total = page.locator('div').filter({ hasText: /^Total Pedidos/ }).first()
+    await expect(total).toContainText(String(antes.pedidos + 2), { timeout: 20_000 })
+    await expect(total).toContainText('clientes — alguém pediu mais de uma vez')
+
+    // nenhum dos dois foi pago, então os dois estão em "A receber": é aí que
+    // o segundo sumiria se o resumo continuasse somando por customer_weeks
+    const money = (c: number) =>
+      (c / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+    await expect(page.getByLabel('A receber'))
+      .toHaveText(money(antes.total_cents + 15910 + 14760))
   })
 })

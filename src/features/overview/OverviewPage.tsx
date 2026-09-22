@@ -189,7 +189,9 @@ function Dashboard({
         <Card titulo="Total Pedidos" valor={String(ov.pedidos.total)}
           delta={comp ? variacao(ov.pedidos.total, comp.pedidos.total) : null}
           onAbrir={() => onDrill('total')}
-          nota={<>{ov.pedidos.novo} Novo + {ov.pedidos.renovacao} Renovação</>} />
+          nota={ov.pedidos.total !== ov.pedidos.clientes
+            ? <>de {ov.pedidos.clientes} clientes · {ov.pedidos.novo} Novo + {ov.pedidos.renovacao} Renovação</>
+            : <>{ov.pedidos.novo} Novo + {ov.pedidos.renovacao} Renovação</>} />
 
         <Card titulo="Ticket médio"
           valor={ov.ticket_medio_cents != null ? money(ov.ticket_medio_cents) : '—'}
