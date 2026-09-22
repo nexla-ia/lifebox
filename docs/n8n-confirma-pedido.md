@@ -49,6 +49,34 @@ escreve em *Configurações › Mensagens*, no idioma em que o cliente fechou o
 pedido. Assim, mudar o texto na tela muda o que o cliente recebe, sem mexer no
 n8n. As `variaveis` vão junto só para quem quiser montar outro formato.
 
+### `{{ $json.mensagem }}` quebra o JSON?
+
+**Em campo de nó (o `text` do envio da Evolution, por exemplo): não.** O n8n
+trata o resultado da expressão como valor de string e monta o corpo da
+requisição ele mesmo — quebra de linha, aspas, barra e emoji passam inteiros.
+
+O payload que chega já é JSON válido: quem monta é o Postgres
+(`jsonb_build_object`), que escapa tudo. Em `$json.mensagem` o texto já chega
+como string de verdade, com quebras de linha reais.
+
+**Onde quebraria:** corpo JSON escrito à mão, tipo um HTTP Request com
+"Specify Body: Using JSON" e o texto colado dentro de aspas:
+
+```json
+{ "text": "{{ $json.mensagem }}" }   ← quebra na primeira quebra de linha
+```
+
+Nesse caso, `JSON.stringify` resolve — e repare que as aspas saem, porque ele
+já as inclui:
+
+```json
+{ "text": {{ JSON.stringify($json.mensagem) }} }
+```
+
+Isso vale para qualquer campo do payload que a LifeBox digita: o template de
+Configurações e as instruções de pagamento são texto livre, e uma aspa vai
+aparecer ali um dia.
+
 ---
 
 ## Telefone → JID do WhatsApp
