@@ -68,7 +68,9 @@ function Folha({ weekId, entrega, iso }: { weekId: string; entrega: string; iso:
   if (error) return <div className="p-5"><ErrorState message={error} onRetry={reload} /></div>
 
   const montados = paradas.filter((p) => p.montado).length
-  const bagsAEnviar = paradas.reduce((s, p) => s + (p.montado ? 0 : p.usa_bag && p.fulfillment === 'delivery' ? p.bag_qty : 0), 0)
+  // todo cliente recebe bag; só o pick-up fica fora (reunião de 22/09/2026)
+  const bagsAEnviar = paradas.reduce(
+    (s, p) => s + (p.montado || p.fulfillment !== 'delivery' ? 0 : p.bag_qty), 0)
 
   return (
     <div className="p-5 flex flex-col gap-4">
@@ -211,9 +213,6 @@ function Linha({
         <div className="text-[13px] font-bold text-ink">{p.cliente}</div>
         <div className="text-[11px] text-ink-3 tnum">{formatarTelefone(p.telefone)}</div>
         <div className="flex gap-1 flex-wrap mt-1">
-          {!p.usa_bag && (
-            <Selo tom="warn">SEM BAG · SÓ PAPEL</Selo>
-          )}
           {p.entregar_com && <Selo tom="info">JUNTO COM {p.entregar_com}</Selo>}
           {p.post_cutoff && <Selo tom="late">PÓS-CUTOFF</Selo>}
           {pickup && <Selo tom="accent">RETIRA NA COZINHA</Selo>}
@@ -248,21 +247,19 @@ function Linha({
 
       {!pickup && (
         <td className="text-center py-2">
-          {p.usa_bag ? (
-            <input
-              aria-label={`Bags de ${p.cliente}`}
-              value={bags}
-              disabled={salvandoBags}
-              inputMode="numeric"
-              onChange={(e) => setBags(apenasDigitos(e.target.value))}
-              onBlur={salvarBags}
-              onKeyDown={(e) => { if (e.key === 'Enter') void salvarBags() }}
-              className={`w-10 text-center border rounded-md py-0.5 outline-none tnum font-bold ${
-                salvandoBags
-                  ? 'border-brand bg-leaf-bg text-brand'
-                  : 'border-line-strong bg-surface-alt focus:border-brand'}`}
-            />
-          ) : <span className="text-ink-muted">—</span>}
+          <input
+            aria-label={`Bags de ${p.cliente}`}
+            value={bags}
+            disabled={salvandoBags}
+            inputMode="numeric"
+            onChange={(e) => setBags(apenasDigitos(e.target.value))}
+            onBlur={salvarBags}
+            onKeyDown={(e) => { if (e.key === 'Enter') void salvarBags() }}
+            className={`w-10 text-center border rounded-md py-0.5 outline-none tnum font-bold ${
+              salvandoBags
+                ? 'border-brand bg-leaf-bg text-brand'
+                : 'border-line-strong bg-surface-alt focus:border-brand'}`}
+          />
         </td>
       )}
 

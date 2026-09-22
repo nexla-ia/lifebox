@@ -74,7 +74,6 @@ export function FichaCliente({
               <Campo
                 rotulo="Recebimento"
                 valor={cliente.fulfillment_preference === 'pickup' ? '🏠 Pick-up' : '🚚 Entrega'}
-                dica={cliente.uses_thermal_bag ? undefined : 'não usa bag térmica, só papel'}
               />
             </dl>
 

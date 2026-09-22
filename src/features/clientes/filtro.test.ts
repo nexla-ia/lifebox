@@ -5,7 +5,7 @@ import type { Cliente } from './api'
 const base = {
   last_name: null, email: null, street_address: null, state: 'MA',
   source_id: null, lead_type: 'new', fulfillment_preference: 'delivery',
-  uses_thermal_bag: true, default_plan_id: null, default_size_id: null,
+  default_plan_id: null, default_size_id: null,
   delivery_notes: null, office_notes: null, kitchen_notes: null,
   created_at: '2026-01-01',
 } as const

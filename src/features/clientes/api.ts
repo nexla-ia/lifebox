@@ -21,7 +21,6 @@ export type Cliente = {
   lead_type: LeadType
   status: StatusCliente
   fulfillment_preference: Fulfillment
-  uses_thermal_bag: boolean
   default_plan_id: string | null
   default_size_id: string | null
   delivery_notes: string | null

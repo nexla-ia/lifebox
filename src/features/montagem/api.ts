@@ -18,7 +18,6 @@ export type ParadaMontagem = {
   pratos: string
   adicionais: string
   bag_qty: number
-  usa_bag: boolean
   montado: boolean
   gelo: boolean
   post_cutoff: boolean
@@ -35,9 +34,9 @@ export async function fetchMontagem(weekId: string) {
       deliver_with_order_id,
       plans(name_pt), sizes!orders_size_id_fkey(code),
       customers!inner(first_name, last_name, phone_e164, street_address, city,
-                      uses_thermal_bag, delivery_notes, office_notes,
+                      delivery_notes, office_notes,
                       routes(id, name)),
-      order_items(item_type, name_snapshot, qty, sizes(code))
+      order_items(item_type, name_snapshot, qty, position, sizes(code))
     `)
     .eq('week_id', weekId)
     .order('code')
@@ -54,12 +53,12 @@ export async function fetchMontagem(weekId: string) {
     customers: {
       first_name: string; last_name: string | null; phone_e164: string
       street_address: string | null; city: string | null
-      uses_thermal_bag: boolean
       delivery_notes: string | null; office_notes: string | null
       routes: { id: string; name: string } | null
     }
     order_items: {
       item_type: string; name_snapshot: string; qty: number
+      position: number | null
       sizes: { code: string } | null
     }[]
   }
@@ -70,7 +69,12 @@ export async function fetchMontagem(weekId: string) {
   return {
     error: null,
     data: brutos.map((o) => {
-      const pratos = o.order_items.filter((i) => i.item_type === 'dish')
+      // `position` é a ordem em que os itens entraram no pedido, e o front
+      // agora lista o menu na ordem do menu — então a sacola sai na mesma
+      // sequência que a cozinha montou (reunião de 22/09/2026)
+      const pratos = o.order_items
+        .filter((i) => i.item_type === 'dish')
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
       const addons = o.order_items.filter((i) => i.item_type === 'addon')
       const comp = o.deliver_with_order_id ? porId.get(o.deliver_with_order_id) : null
       return {
@@ -91,7 +95,6 @@ export async function fetchMontagem(weekId: string) {
           .join(' · '),
         adicionais: addons.map((i) => `${i.name_snapshot} ×${i.qty}`).join(' · '),
         bag_qty: o.bag_qty,
-        usa_bag: o.customers.uses_thermal_bag,
         montado: o.assembled_at !== null,
         gelo: o.ice_packed,
         post_cutoff: o.post_cutoff,

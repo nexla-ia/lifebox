@@ -18,6 +18,9 @@ export type LinhaProducao = {
   qty: number
   has_post_cutoff: boolean
   qty_post_cutoff: number | null
+  /** posição do prato no menu da semana. 999999 = não está no menu deste
+   *  ciclo (pedido pós-cutoff com prato de outro menu) e vai para o fim */
+  menu_position: number
 }
 
 export type NotaCozinha = {
@@ -123,9 +126,14 @@ export async function fetchMatriz(weekId: string) {
 }
 
 /** Agrupa por categoria e prato, somando por tamanho. É o que vai para a
- *  bancada: a cozinha lê "quantos de cada prato, em cada tamanho". */
+ *  bancada: a cozinha lê "quantos de cada prato, em cada tamanho".
+ *
+ *  A ordem dentro da categoria é a DO MENU, não alfabética (reunião de
+ *  22/09/2026): a cozinha monta olhando o menu, e duas ordens diferentes
+ *  transformam cada prato numa busca. */
 export function agrupar(linhas: LinhaProducao[], tamanhos: string[]) {
   const porCategoria = new Map<string, Map<string, Record<string, number>>>()
+  const posicao = new Map<string, number>()
 
   for (const l of linhas) {
     const cat = l.category ?? 'classico'
@@ -135,6 +143,9 @@ export function agrupar(linhas: LinhaProducao[], tamanhos: string[]) {
     const linha = pratos.get(l.dish_name_pt)!
     const size = l.size_code ?? '—'
     linha[size] = (linha[size] ?? 0) + l.qty
+    posicao.set(l.dish_name_pt, Math.min(
+      posicao.get(l.dish_name_pt) ?? Number.MAX_SAFE_INTEGER,
+      l.menu_position ?? Number.MAX_SAFE_INTEGER))
   }
 
   return [...porCategoria.entries()].map(([categoria, pratos]) => {
@@ -144,7 +155,13 @@ export function agrupar(linhas: LinhaProducao[], tamanhos: string[]) {
         porTamanho,
         total: tamanhos.reduce((s, t) => s + (porTamanho[t] ?? 0), 0),
       }))
-      .sort((a, b) => a.prato.localeCompare(b.prato))
+      .sort((a, b) => {
+        const pa = posicao.get(a.prato) ?? Number.MAX_SAFE_INTEGER
+        const pb = posicao.get(b.prato) ?? Number.MAX_SAFE_INTEGER
+        // empate (fora do menu, ou menu sem ordem definida) cai no alfabético,
+        // que ao menos é estável entre as impressões
+        return pa !== pb ? pa - pb : a.prato.localeCompare(b.prato)
+      })
     return {
       categoria,
       itens,

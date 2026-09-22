@@ -1,14 +1,36 @@
 import { describe, expect, it } from 'vitest'
 import { agrupar, type LinhaProducao } from './api'
 
-const l = (prato: string, cat: string, size: string, qty: number): LinhaProducao => ({
+const l = (
+  prato: string, cat: string, size: string, qty: number, pos = 0,
+): LinhaProducao => ({
   week_id: 'w', dish_id: prato, dish_name_pt: prato,
   category: cat as LinhaProducao['category'], size_code: size, qty,
-  has_post_cutoff: false, qty_post_cutoff: 0,
+  has_post_cutoff: false, qty_post_cutoff: 0, menu_position: pos,
 })
 
 describe('agrupar', () => {
   const TAM = ['S', 'L']
+
+  // a cozinha monta olhando o menu: a folha em outra ordem vira busca item a
+  // item, e quem monta doze sacolas seguidas não procura, erra
+  it('ordena pela posição do menu, não pelo alfabeto', () => {
+    const [g] = agrupar([
+      l('Zuppa', 'classico', 'S', 1, 1),
+      l('Arroz', 'classico', 'S', 1, 2),
+      l('Moqueca', 'classico', 'S', 1, 3),
+    ], TAM)
+    expect(g.itens.map((i) => i.prato)).toEqual(['Zuppa', 'Arroz', 'Moqueca'])
+  })
+
+  it('prato fora do menu da semana vai para o fim, não some', () => {
+    // pedido pós-cutoff com prato de outro ciclo: a view devolve 999999
+    const [g] = agrupar([
+      l('De outro menu', 'classico', 'S', 1, 999999),
+      l('Do menu', 'classico', 'S', 1, 1),
+    ], TAM)
+    expect(g.itens.map((i) => i.prato)).toEqual(['Do menu', 'De outro menu'])
+  })
 
   it('soma por prato e tamanho', () => {
     const [g] = agrupar([l('Moqueca', 'classico', 'S', 3), l('Moqueca', 'classico', 'L', 2)], TAM)

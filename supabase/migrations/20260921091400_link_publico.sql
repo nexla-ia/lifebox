@@ -164,7 +164,8 @@ begin
                           'label_en', a.label_en, 'icon', a.icon))
                    from dish_allergens da join allergens a on a.id = da.allergen_id
                   where da.dish_id = d.id and a.active), '[]'::jsonb))
-             order by d.category, d.name_en)
+             -- a ordem é a do menu, a mesma que a cozinha monta (reunião 22/09)
+             order by md.position, d.name_en)
         from menu_dishes md join dishes d on d.id = md.dish_id
        where md.menu_id = v_menu and md.active and d.active), '[]'::jsonb),
 

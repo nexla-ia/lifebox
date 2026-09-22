@@ -46,7 +46,6 @@ export function FormCliente({ dados, cliente, nomeInicial, onCancelar, onSalvo }
   const [fulfillment, setFulfillment] = useState<Fulfillment>(
     cliente?.fulfillment_preference ?? 'delivery',
   )
-  const [usaBag, setUsaBag] = useState(cliente?.uses_thermal_bag ?? true)
   const [planoId, setPlanoId] = useState(cliente?.default_plan_id ?? '')
   const [tamanhoId, setTamanhoId] = useState(cliente?.default_size_id ?? '')
   const [notasEntrega, setNotasEntrega] = useState(cliente?.delivery_notes ?? '')
@@ -111,7 +110,6 @@ export function FormCliente({ dados, cliente, nomeInicial, onCancelar, onSalvo }
       source_id: origemId || null,
       status,
       fulfillment_preference: fulfillment,
-      uses_thermal_bag: usaBag,
       default_plan_id: planoId || null,
       default_size_id: tamanhoId || null,
       delivery_notes: notasEntrega.trim() || null,
@@ -236,11 +234,6 @@ export function FormCliente({ dados, cliente, nomeInicial, onCancelar, onSalvo }
             <option value="">—</option>
             {dados.tamanhos.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select></label>
-        <label className="flex items-center gap-2 text-[12.5px] text-ink pb-2 cursor-pointer">
-          <input type="checkbox" checked={!usaBag} onChange={(e) => setUsaBag(!e.target.checked)}
-                 className="accent-[var(--color-brand)] w-4 h-4" />
-          Não usa bag térmica (só papel)
-        </label>
       </div>
 
       <label>
