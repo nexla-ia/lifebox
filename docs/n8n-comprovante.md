@@ -73,6 +73,36 @@ manda.
 No nó Supabase do n8n é *Row › Get*, tabela `orders`, duas condições:
 `phone_e164` e `payment_status`.
 
+### A hora que a LifeBox lê
+
+`created_at` é `timestamptz` e sai em **UTC**: o pedido das 16:48 de Boston
+aparece como `2026-09-21 20:48:42`. Para conferir contra o horário do
+comprovante, consulte **`v_pedido_automacao`** no lugar de `orders` — mesma
+consulta, e ela já traz `created_at_local` e `fuso`:
+
+```
+GET {SUPABASE_URL}/rest/v1/v_pedido_automacao
+    ?phone_e164=eq.%2B17744148199
+    &payment_status=neq.confirmado
+```
+
+```json
+{ "code": "W39-0001", "payment_status": "aguardando_pagamento",
+  "created_at": "2026-09-21T20:48:42+00:00",
+  "created_at_local": "2026-09-21T16:48:42",
+  "em_aberto_cents": 2070, "fuso": "America/New_York" }
+```
+
+**Não grave o deslocamento em lugar nenhum, e não use `-4` fixo.**
+America/New_York é −4 agora e vira **−5 em 01/11/2026**, quando acaba o horário
+de verão. Manaus é −4 o ano inteiro; Boston não. Um `-4` escrito no fluxo passa
+a errar uma hora a partir de novembro, e a checagem de "pagamento anterior ao
+pedido" começaria a recusar comprovante bom. Por isso a conversão é derivada, a
+partir do **nome** do fuso, que é o que o Postgres resolve data a data.
+
+Se precisar converter no n8n, use o nome, nunca o número:
+`$json.created_at.toDateTime().setZone('America/New_York')`.
+
 Se preferir já mastigado — com a semana corrente filtrada e o `em_aberto_cents`
 calculado:
 
@@ -169,7 +199,7 @@ Resposta:
 |---|---|
 | `ok` | passou em tudo |
 | `duplicado` | `transaction_id` ou imagem já recebidos |
-| `valor_divergente` | valor ≠ o que está em aberto, ou pagamento anterior ao pedido |
+| `valor_divergente` | valor ≠ o que está em aberto, ou pagamento anterior ao pedido (o corte é a meia-noite do dia do pedido **no fuso da operação**) |
 | `destinatario_nao_reconhecido` | chave fora de Configurações › Formas de pagamento |
 | `baixa_confianca` | a extração leu mal |
 | `sem_pedido` | número fora do cadastro, nenhum pedido aberto, **ou mais de um** |

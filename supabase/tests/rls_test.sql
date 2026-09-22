@@ -100,6 +100,11 @@ begin
   perform assert_eq((select count(*) from plan_prices)::int, 0, 'nao ve precos');
   perform assert_eq((select count(*) from v_week_summary
                       where total_pedidos > 0)::int,         0, 'nao ve faturamento');
+  -- View NAO tem RLS propria: sem `security_invoker` ela roda com os direitos
+  -- de quem a criou, e esta aqui carrega telefone, status e dinheiro. Seria a
+  -- porta dos fundos de `orders`, aberta para a Cozinha.
+  perform assert_eq((select count(*) from v_pedido_automacao)::int,
+                    0, 'nao ve a view da automacao');
   -- a única porta aberta: a folha da bancada
   perform assert_eq((select sum(qty)::int from v_production
                       where dish_name_pt = 'Prato RLS'),    11, 've a producao');

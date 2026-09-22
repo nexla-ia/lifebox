@@ -298,6 +298,71 @@ begin
   raise notice 'EVOLUTION OK';
 end $evo$;
 
+-- ------------------------------------------- a hora do relogio da LifeBox
+do $hora$
+declare
+  v_plan uuid; v_s uuid; v_d uuid; v_w uuid; v_c uuid; v_o uuid; r jsonb;
+begin
+  raise notice 'o fuso NAO e um deslocamento fixo';
+  perform assert_eq(fn_fuso_operacional(), 'America/New_York', 'fuso vem de settings');
+  -- setembro e -4; dezembro e -5. Gravar "-4" numa coluna seria gravar um erro
+  -- com data marcada para 01/11/2026, quando acaba o horario de verao.
+  perform assert_eq(fn_hora_local(timestamptz '2026-09-21 20:48:42+00')::text,
+                    '2026-09-21 16:48:42', 'setembro: -4');
+  perform assert_eq(fn_hora_local(timestamptz '2026-12-21 20:48:42+00')::text,
+                    '2026-12-21 15:48:42', 'dezembro: -5');
+
+  select id into v_plan from plans  where name_en = 'PLAN CMP';
+  select id into v_s    from sizes  where code = 'S';
+  select id into v_d    from dishes where name_en = 'Dish cmp';
+  v_w := fn_semana_atual();
+
+  insert into customers (first_name, phone_e164, status)
+    values ('Hora Certa', '+15552220004', 'ativo') returning id into v_c;
+  r := fn_create_order(jsonb_build_object(
+    'customer_id', v_c, 'week_id', v_w, 'kind','plan','plan_id',v_plan,'size_id',v_s,
+    'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_d,'qty',5))));
+  v_o := (r->>'order_id')::uuid;
+
+  raise notice 'a automacao recebe a hora local junto, formatada';
+  perform assert_eq(fn_pedidos_do_telefone('+15552220004')->>'fuso',
+                    'America/New_York', 'a resposta diz de que fuso e a hora');
+  perform assert_eq(
+    fn_pedidos_do_telefone('+15552220004')->'pedidos'->0->>'criado_em_local',
+    to_char(fn_hora_local((select created_at from orders where id = v_o)),
+            'YYYY-MM-DD HH24:MI:SS'),
+    'criado_em_local no formato que a tela do n8n mostra');
+
+  raise notice 'pagamento da VESPERA e recusado — o corte sai no fuso da operacao';
+  -- Era aqui que o corte em UTC vazava: pedido feito as 10h de Boston tem
+  -- created_at::date = o dia em UTC, cuja meia-noite e 19h do dia ANTERIOR em
+  -- Boston. Um comprovante da noite de vespera passava como se fosse do
+  -- pedido — pagamento que aconteceu antes de o pedido existir.
+  update orders set created_at = timestamptz '2026-11-15 10:00-05' where id = v_o;
+  r := fn_registrar_comprovante(jsonb_build_object(
+    'order_id', v_o,
+    'valor_cents', (select total_cents - paid_amount_cents from orders where id = v_o),
+    'storage_path','comprovantes/k.jpg',
+    'destinatario','pagamentos@lifebox.test',
+    'pago_em', '2026-11-14 20:00-05',
+    'confianca', 0.99));
+  perform assert_eq(r->>'motivo', 'valor_divergente', 'recusa pagamento de antes do pedido');
+  perform assert_eq(position('anterior ao pedido' in (r->>'detalhe')) > 0, true,
+                    'e o motivo diz as duas horas, na hora de la');
+
+  raise notice 'e o do mesmo dia, mais cedo, passa — a folga de um dia continua';
+  r := fn_registrar_comprovante(jsonb_build_object(
+    'order_id', v_o,
+    'valor_cents', (select total_cents - paid_amount_cents from orders where id = v_o),
+    'storage_path','comprovantes/l.jpg',
+    'destinatario','pagamentos@lifebox.test',
+    'pago_em', '2026-11-15 09:30-05',
+    'confianca', 0.99));
+  perform assert_eq(r->>'motivo', 'ok', 'mesmo dia passa');
+
+  raise notice 'HORA LOCAL OK';
+end $hora$;
+
 -- ----------------------------------------------------- comprovante e dinheiro
 do $seg$
 begin
