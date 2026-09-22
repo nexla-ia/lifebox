@@ -468,9 +468,18 @@ função `security definer` o guard é a única barreira: sem ele, um chamador
 anônimo criava Administrador. Reproduzido antes do conserto, coberto em
 `usuarios_test.sql`.
 
-**Função nova no Postgres nasce com EXECUTE para PUBLIC.** `grant ... to
-authenticated` não fecha nada, só acrescenta. Toda função que escreve fora da
-RLS precisa de `revoke execute ... from public` antes do grant.
+**Função nova nasce aberta, e `revoke ... from public` não basta no Supabase.**
+São duas concessões: o Postgres dá EXECUTE a PUBLIC, e o Supabase dá, além
+disso, nominalmente ao role `anon`. Fechar só a primeira deixa a segunda, e o
+cluster local não tem a segunda — então o teste passa e o Supabase fica aberto.
+`alter default privileges` também não resolve: a linha guardada soma-se ao
+padrão embutido em vez de substituí-lo (medido em
+`migrations/20260921092500_fechar_anon.sql`), então PUBLIC volta em toda função
+nova. Quem cobra é `link_test.sql`, que lista **tudo** que o anon alcança em
+`public` e falha nomeando o que não está na lista curta do link e do convite.
+Exceção consciente: `is_admin`, `is_staff` e `current_role_of` ficam abertas —
+a policy roda com o privilégio de quem consulta, e sem EXECUTE o anon receberia
+**erro** em vez do resultado **vazio** de que o §9.7 depende.
 
 **Trava de regra que a tela usa também tem de valer pela tabela.** A policy
 `profiles_admin_all` deixa o Administrador editar qualquer linha de `profiles`
