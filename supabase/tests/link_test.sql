@@ -150,6 +150,47 @@ begin
   perform assert_eq((select lead_type from customers where id = v_cli)::text, 'old',
                     'quem pediu deixa de ser primeiro contato (§6.2)');
 
+  raise notice 'o pedido avisa a automacao, com a mensagem montada (§9.2)';
+  perform assert_eq((select count(*)::int from net.chamadas), 1, 'um disparo, um pedido');
+  perform assert_eq(
+    (select url from net.chamadas order by id desc limit 1),
+    (select value #>> '{}' from settings where key = 'webhook_order_confirmation'),
+    'foi para a URL do settings, nao para uma fixa no codigo');
+  perform assert_eq((select body->>'telefone' from net.chamadas order by id desc limit 1),
+                    '+15550100003', 'telefone em E.164, que e a chave do WhatsApp');
+  perform assert_eq((select body->>'code' from net.chamadas order by id desc limit 1) is not null,
+                    true, 'codigo do pedido no payload');
+  -- a mensagem e a que a LifeBox escreveu na tela 6p, ja preenchida
+  perform assert_eq(
+    (select position('{' in (body->>'mensagem')) from net.chamadas order by id desc limit 1),
+    0, 'nenhuma variavel sobrou por substituir');
+  perform assert_eq(
+    (select position((select code from orders where customer_id = v_cli)
+                     in (body->>'mensagem')) > 0
+       from net.chamadas order by id desc limit 1),
+    true, 'o numero do pedido entrou no texto');
+  perform assert_eq(
+    (select body->'variaveis'->>'total' from net.chamadas order by id desc limit 1),
+    '$95.60', 'total formatado como o cliente le');
+
+  raise notice 'webhook fora do ar nao derruba o pedido';
+  -- URL invalida: fn_notificar_pedido engole o erro e o pedido continua de pe
+  update settings set value = '"nao-e-url"' where key = 'webhook_order_confirmation';
+  declare v_antes int; begin
+    select count(*) into v_antes from orders;
+    perform fn_link_criar_pedido(jsonb_build_object(
+      'phone','+15550100009','first_name','Apesar do Webhook','zip_code','02118',
+      'kind','plan','plan_id',v_plan,'size_id',v_s,
+      'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_d,'qty',5))));
+    perform assert_eq((select count(*)::int from orders), v_antes + 1,
+                      'pedido gravado mesmo com webhook quebrado');
+  end;
+
+  raise notice 'URL vazia desliga o aviso, sem erro';
+  update settings set value = '""' where key = 'webhook_order_confirmation';
+  perform assert_eq(fn_notificar_pedido(
+    (select id from orders where customer_id = v_cli), 'pt'), null, 'saiu calado');
+
   raise notice 'segundo pedido na mesma semana vira estado, nao duplicata (tela 6m)';
   begin
     perform fn_link_criar_pedido(jsonb_build_object(

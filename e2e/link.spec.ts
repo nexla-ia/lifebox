@@ -1,8 +1,9 @@
 import { expect, test, type Page } from '@playwright/test'
 import './env'
 import {
-  criarAdicionalTeste, criarFixturePedido, criarZipTeste, limparFixturePedido,
-  limparMarca, limparPedidosECliente, limparZip,
+  criarAdicionalTeste, criarFixturePedido, criarZipTeste, lerWebhookPedido,
+  limparFixturePedido, limparMarca, limparPedidosECliente, limparZip,
+  setWebhookPedido,
 } from './supabaseTest'
 
 /** Link público de pedido (§9.7 · telas 6e a 6m).
@@ -21,6 +22,7 @@ const telefone = `+1508${marca}1`
 const digitado = `508${marca}1`
 
 let fx: Awaited<ReturnType<typeof criarFixturePedido>> = null
+let webhookAntes = ''
 
 async function abrir(page: Page, lang?: 'pt') {
   await page.goto(lang ? `/pedido?lang=${lang}` : '/pedido')
@@ -47,8 +49,13 @@ test.describe('link público', () => {
     fx = await criarFixturePedido(marca)
     await criarZipTeste(ZIP_OK, 'Boston')
     await criarAdicionalTeste(marca, 2990)
+    // o teste fecha pedido de verdade: com o webhook ligado, a automação
+    // tentaria mandar WhatsApp para um número inventado a cada rodada
+    webhookAntes = await lerWebhookPedido()
+    await setWebhookPedido('')
   })
   test.afterAll(async () => {
+    await setWebhookPedido(webhookAntes)
     await limparPedidosECliente(telefone)
     if (fx) await limparFixturePedido(marca, fx.telefone)
     await limparMarca(marca)

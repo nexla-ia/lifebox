@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test'
 import './env'
-import { criarFixturePedido, limparFixturePedido, limparMeta } from './supabaseTest'
+import {
+  criarFixturePedido, lerOverviewSemana, limparFixturePedido, limparMeta,
+} from './supabaseTest'
 
 /** Painel da Semana. Ref: protótipo 10a e 9a.
  *
@@ -12,12 +14,18 @@ const senha = process.env.E2E_SENHA
 const marca = Date.now().toString().slice(-6)
 
 let fx: Awaited<ReturnType<typeof criarFixturePedido>> = null
+// a semana é da cliente e pode já ter pedido dela: o teste mede o que o
+// próprio lançamento acrescenta, não o total da semana
+let antes = { total_cents: 0, pedidos: 0 }
 
 test.describe('painel da semana', () => {
   test.describe.configure({ mode: 'serial' })
   test.skip(!email || !senha, 'defina E2E_EMAIL e E2E_SENHA para rodar')
 
-  test.beforeAll(async () => { fx = await criarFixturePedido(marca) })
+  test.beforeAll(async () => {
+    antes = await lerOverviewSemana()
+    fx = await criarFixturePedido(marca)
+  })
   test.afterAll(async () => {
     if (fx) {
       await limparFixturePedido(marca, fx.telefone)
@@ -57,11 +65,20 @@ test.describe('painel da semana', () => {
     await expect(page.getByText(/criado/)).toBeVisible({ timeout: 20_000 })
   }
 
-  test('semana vazia mostra "tudo em dia" e nenhum pedido', async ({ page }) => {
+  test('"Precisa de ação agora" é o primeiro bloco da semana', async ({ page }) => {
     await entrar(page)
     await expect(page.getByRole('heading', { name: 'Precisa de ação agora' }))
       .toBeVisible({ timeout: 20_000 })
-    await expect(page.getByText('Tudo em dia')).toBeVisible()
+
+    // "Tudo em dia" só aparece quando NÃO há pendência, e a semana é da
+    // cliente: ela pode ter lançado pedido aguardando pagamento. O teste
+    // confere o estado que existe em vez de exigir a semana vazia.
+    const lista = page.getByRole('listitem')
+    if (await page.getByText('Tudo em dia').isVisible()) {
+      await expect(lista).toHaveCount(0)
+    } else {
+      await expect(lista.first()).toBeVisible()
+    }
   })
 
   test('define a meta e o card mostra o percentual', async ({ page }) => {
@@ -78,8 +95,8 @@ test.describe('painel da semana', () => {
 
     // §6.4: Total Pedidos conta Novo + Renovação
     const total = page.locator('div').filter({ hasText: /^Total Pedidos/ }).first()
-    await expect(total).toContainText('1', { timeout: 20_000 })
-    await expect(total).toContainText('1 Novo')
+    await expect(total).toContainText(String(antes.pedidos + 1), { timeout: 20_000 })
+    await expect(total).toContainText('Novo')
 
     // Pedido novo nasce aguardando pagamento. Checamos pelo BOTÃO que o cartão
     // oferece — comportamento — em vez de pela estrutura da coluna, que é
@@ -100,9 +117,13 @@ test.describe('painel da semana', () => {
 
     await cartaoNoQuadro(page).getByRole('button', { name: /Confirmado/ }).click()
 
-    // §6.4: faturado conta só pagamento confirmado — o valor migra de um para o outro
-    await expect(page.getByLabel('Faturado')).toHaveText('$147.60', { timeout: 20_000 })
-    await expect(page.getByLabel('A receber')).toHaveText('$0.00')
+    // §6.4: faturado conta só pagamento confirmado — o valor MIGRA de um card
+    // para o outro. O que se testa é a migração dos $147.60 do pedido do
+    // teste; o resto da semana é da cliente e continua onde estava.
+    const money = (c: number) =>
+      (c / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+    await expect(page.getByLabel('Faturado')).toHaveText(money(14760), { timeout: 20_000 })
+    await expect(page.getByLabel('A receber')).toHaveText(money(antes.total_cents))
     // e o cartão não oferece mais avanço: confirmado é o fim da fila
     await expect(cartaoNoQuadro(page).getByRole('button', { name: /→/ })).toHaveCount(0)
   })

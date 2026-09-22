@@ -104,12 +104,18 @@ verde. Pelo mesmo motivo, `scripts/db.sh test` aborta com exit 1 se não
 conseguir conectar — runner que reporta "0 falhas" sem ter rodado é o pior
 resultado possível.
 
-**O banco do e2e é o da cliente, e ela já usa o sistema.** Teste não pode supor
-lista vazia nem varrer a tela para montar a limpeza: `zips.spec.ts` recolhia
-todos os ZIPs visíveis para apagar no fim e teria apagado os que a LifeBox
-cadastrou. Limpe pelo que o teste CRIOU, filtrando pela marca; e quando o
-estado a conferir depende de a tabela estar vazia, confira o estado que existe
-em vez de esvaziar.
+**O banco do e2e é o da cliente, e ela já usa o sistema.** Três regras que
+vieram de quebrar de verdade:
+
+- **Limpe pelo que o teste CRIOU**, filtrando pela marca. `zips.spec.ts`
+  recolhia todos os ZIPs visíveis na tela para apagar no fim e teria apagado os
+  que a LifeBox cadastrou.
+- **Meça diferença, nunca total absoluto.** A cliente lançou um pedido pelo
+  link e três specs quebraram de uma vez — faturamento da semana, contagem da
+  produção e "Total Pedidos" — sem haver bug nenhum. `lerOverviewSemana()` e
+  `lerItensProducao()` dão a linha de base no `beforeAll`.
+- **Estado que exige tabela vazia não se força.** Confira o estado que existe:
+  esvaziar seria apagar dado real.
 
 Os testes que gravam no Supabase limpam em **hook `afterAll`**, nunca em
 `try/finally`: quando um teste estoura o timeout o Playwright aborta o corpo e
@@ -300,6 +306,25 @@ vem do servidor — senão aparece "Plano 10+5" no meio de uma tela em inglês.
 `weeks` está vazia. Função volátil só é avaliada por linha varrida; sem linha,
 a semana nunca é criada. O link abriria em branco justamente na segunda de
 manhã, no primeiro acesso da semana. Chame para uma variável antes.
+
+## Aviso para a automação (§9.2)
+
+Ao fechar pedido pelo link, `fn_link_criar_pedido` chama `fn_notificar_pedido`,
+que faz `net.http_post` (pg_net) para a URL em
+`settings.webhook_order_confirmation`. Vai o texto **já montado** pelo template
+de Configurações mais as variáveis soltas: o n8n entrega, não reescreve.
+
+**O disparo é do banco, não do navegador.** Fechar a aba logo depois de
+confirmar perderia a mensagem, e um bloqueador ou rede ruim também — e do lado
+do cliente qualquer um poderia mandar payload inventado para o webhook.
+
+**Webhook nunca derruba pedido.** `pg_net` é assíncrono e `fn_notificar_pedido`
+engole o próprio erro: URL vazia desliga o aviso, URL quebrada grava
+`webhook_confirmacao_falhou` no `audit_log` e o pedido segue. Perder a mensagem
+é ruim; perder o pedido porque o n8n caiu seria pior.
+
+O e2e **desliga o webhook** no `beforeAll` e devolve no `afterAll`: sem isso,
+cada rodada mandaria a automação tentar um WhatsApp para número de teste.
 
 ## Montagem e bags
 

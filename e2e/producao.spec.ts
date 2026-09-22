@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test'
 import './env'
-import { criarFixturePedido, criarPedidoDireto, limparFixturePedido } from './supabaseTest'
+import {
+  criarFixturePedido, criarPedidoDireto, lerItensProducao, limparFixturePedido,
+} from './supabaseTest'
 
 /** Produção da cozinha. Ref: protótipo 3a, 3b, 3c, 3d.
  *
@@ -15,6 +17,9 @@ const senhaCozinha = process.env.E2E_COZINHA_SENHA
 const marca = Date.now().toString().slice(-6)
 
 let fx: Awaited<ReturnType<typeof criarFixturePedido>> = null
+// a semana pode já ter pedido da LifeBox: a folha conta tudo, então o teste
+// mede o que o próprio pedido acrescenta
+let itensAntes = 0
 
 async function login(page: import('@playwright/test').Page, e: string, s: string) {
   await page.goto('/')
@@ -29,6 +34,7 @@ test.describe('produção', () => {
   test.skip(!email || !senha, 'defina E2E_EMAIL e E2E_SENHA para rodar')
 
   test.beforeAll(async () => {
+    itensAntes = await lerItensProducao()
     fx = await criarFixturePedido(marca)
     if (fx) {
       // 11 refeições + 5 breakfasts, com kitchen notes no cliente
@@ -43,8 +49,9 @@ test.describe('produção', () => {
 
     await expect(page.getByRole('heading', { name: 'Produção da cozinha' }))
       .toBeVisible({ timeout: 20_000 })
-    // 11 + 5 = 16 itens que a cozinha produz
-    await expect(page.getByText(/16 itens/)).toBeVisible()
+    // 11 + 5 = 16 itens a mais na bancada
+    await expect(page.getByText(new RegExp(`${itensAntes + 16} itens`)))
+      .toBeVisible({ timeout: 20_000 })
 
     // linha da tabela, não a div do bloco: papel semântico não muda com o layout
     const linha = page.getByRole('row').filter({ hasText: `Prato ${marca}` })

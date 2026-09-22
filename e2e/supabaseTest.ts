@@ -353,3 +353,55 @@ export async function removerUsuarioTeste(email: string) {
     body: JSON.stringify({ p_user: p.id }),
   })
 }
+
+/** Webhook de pedido novo (§9.2). O e2e cria pedido de verdade pelo link, e
+ *  com a URL ligada cada rodada mandaria a automação tentar um WhatsApp para
+ *  número de teste. O spec desliga no beforeAll e devolve no afterAll — mesmo
+ *  cuidado do cutoff e do template, que também são configuração global. */
+export async function lerWebhookPedido(): Promise<string> {
+  const r = await rest('settings?select=value&key=eq.webhook_order_confirmation')
+  const [linha] = r ? ((await r.json()) as { value: unknown }[]) : []
+  return typeof linha?.value === 'string' ? linha.value : ''
+}
+
+export async function setWebhookPedido(url: string) {
+  await rest('settings?key=eq.webhook_order_confirmation', {
+    method: 'PATCH',
+    body: JSON.stringify({ value: url }),
+    headers: { Prefer: 'return=minimal' },
+  })
+}
+
+/** Números da semana corrente, direto da função do Overview.
+ *
+ *  Serve para o teste medir a DIFERENÇA que o próprio pedido causou. O banco
+ *  é o da cliente e ela já lança pedido de verdade: assumir total absoluto faz
+ *  o teste quebrar no dia em que alguém usa o sistema, sem haver bug. */
+export async function lerOverviewSemana(): Promise<{ total_cents: number; pedidos: number }> {
+  const c = await conectar()
+  if (!c) return { total_cents: 0, pedidos: 0 }
+  const semana = await fetch(`${c.url}/rest/v1/rpc/fn_link_semana`, {
+    method: 'POST',
+    headers: { apikey: c.key, Authorization: `Bearer ${c.token}`, 'Content-Type': 'application/json' },
+    body: '{}',
+  })
+  const { iso_code } = (await semana.json()) as { iso_code: string }
+  const r = await fetch(`${c.url}/rest/v1/rpc/fn_overview`, {
+    method: 'POST',
+    headers: { apikey: c.key, Authorization: `Bearer ${c.token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_tipo: 'week', p_chave: iso_code }),
+  })
+  if (!r.ok) return { total_cents: 0, pedidos: 0 }
+  const ov = (await r.json()) as {
+    faturamento: { total_cents: number }; pedidos: { total: number }
+  }
+  return { total_cents: ov.faturamento.total_cents, pedidos: ov.pedidos.total }
+}
+
+/** Quantos itens a cozinha já tem para produzir na semana corrente. */
+export async function lerItensProducao(): Promise<number> {
+  const r = await rest('v_production?select=qty')
+  if (!r) return 0
+  const linhas = (await r.json()) as { qty: number }[]
+  return linhas.reduce((s, l) => s + Number(l.qty ?? 0), 0)
+}

@@ -157,6 +157,9 @@ export const precificarLink = (p: {
 export const criarPedidoLink = (p: {
   phone: string
   first_name: string
+  /** idioma em que o cliente fechou o pedido: a mensagem de confirmação sai
+   *  nele, não no da equipe (§9.2) */
+  lang: 'pt' | 'en'
   last_name?: string
   street_address?: string
   zip_code: string

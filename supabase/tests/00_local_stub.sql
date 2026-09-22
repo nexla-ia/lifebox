@@ -77,6 +77,27 @@ grant usage on schema public to anon, authenticated, service_role;
 grant usage on schema auth to anon, authenticated, service_role;
 grant execute on function auth.uid() to anon, authenticated, service_role;
 
+-- pg_net é do Supabase. Aqui vai um dublê que GRAVA a chamada em vez de sair
+-- na rede: é o que deixa o teste conferir o payload do webhook (§9.2) sem
+-- depender do n8n estar de pé. Os nomes dos parâmetros importam — a função que
+-- chama usa `url :=`, `body :=` e `timeout_milliseconds :=`.
+create schema if not exists net;
+create table if not exists net.chamadas (
+  id        bigserial primary key,
+  url       text,
+  body      jsonb,
+  criado_em timestamptz not null default now()
+);
+create or replace function net.http_post(
+  url text,
+  body jsonb default '{}'::jsonb,
+  params jsonb default '{}'::jsonb,
+  headers jsonb default '{}'::jsonb,
+  timeout_milliseconds int default 5000
+) returns bigint language sql as $fn$
+  insert into net.chamadas (url, body) values (url, body) returning id
+$fn$;
+
 -- Storage: o Supabase fornece; aqui só o esqueleto que a migration 0800 toca.
 create schema if not exists storage;
 

@@ -101,6 +101,7 @@ export function LinkPage() {
     const { data, error } = await criarPedidoLink({
       phone: dados.telefone,
       first_name: dados.first_name,
+      lang,
       last_name: dados.last_name || undefined,
       street_address: dados.street_address || undefined,
       zip_code: dados.zip_code,
