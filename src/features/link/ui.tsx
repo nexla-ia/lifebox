@@ -19,6 +19,27 @@ export function Campo({
   )
 }
 
+/** Grupo de botões que funciona como escolha (entrega/retirada, forma de
+ *  pagamento).
+ *
+ *  NÃO usa `<label>`: label envolvendo botões faz o texto dela entrar no nome
+ *  acessível de CADA botão — "Como você quer receber? 🏠 Retirar…" — e aí dois
+ *  botões diferentes passam a casar com o mesmo texto. Some no leitor de tela
+ *  e quebra qualquer busca por nome. */
+export function Grupo({
+  label, ajuda, children,
+}: { label: string; ajuda?: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[12px] font-semibold text-ink-2">{label}</span>
+      <div role="group" aria-label={label} className="flex gap-2 flex-wrap">
+        {children}
+      </div>
+      {ajuda && <span className="text-[11px] text-ink-muted leading-snug">{ajuda}</span>}
+    </div>
+  )
+}
+
 export const inputCls =
   'w-full border border-line-strong rounded-lg px-3 py-2.5 text-[14px] bg-surface-alt ' +
   'outline-none focus:border-brand placeholder:text-ink-muted'

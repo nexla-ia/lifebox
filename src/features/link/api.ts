@@ -65,9 +65,13 @@ export type AdicionalLink = {
   variants: { id: string; name_pt: string; name_en: string }[]
 }
 
+export type Janela = { start: string; end: string } | null
+
 export type CatalogoLink = {
   tax_rate: number
   delivery_fee_cents: number
+  pickup_window: Janela
+  delivery_window: Janela
   sizes: Tamanho[]
   plans: PlanoLink[]
   custom_prices: { size_id: string; unit_price_cents: number }[]
@@ -150,9 +154,11 @@ export const identificar = (phone: string) =>
   rpc<Identificacao>('fn_link_identificar', { p_phone: phone })
 
 export const precificarLink = (p: {
-  kind: 'plan' | 'custom' | 'addons_only'
+  kind: 'plan' | 'custom'
   plan_id?: string | null
   size_id?: string | null
+  /** entra no cálculo: pick-up não cobra delivery (§6.6) */
+  fulfillment: 'delivery' | 'pickup'
   items: ItemPedido[]
 }) => rpc<Preco>('fn_link_precificar', { p })
 
@@ -165,9 +171,10 @@ export const criarPedidoLink = (p: {
   last_name?: string
   street_address?: string
   zip_code: string
+  fulfillment: 'delivery' | 'pickup'
   delivery_notes?: string
   payment_method_id?: string | null
-  kind: 'plan' | 'custom' | 'addons_only'
+  kind: 'plan' | 'custom'
   plan_id?: string | null
   size_id?: string | null
   items: ItemPedido[]

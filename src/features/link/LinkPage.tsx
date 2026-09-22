@@ -106,6 +106,7 @@ export function LinkPage() {
       last_name: dados.last_name || undefined,
       street_address: dados.street_address || undefined,
       zip_code: dados.zip_code,
+      fulfillment: dados.fulfillment,
       delivery_notes: dados.delivery_notes || undefined,
       payment_method_id: dados.payment_method_id || null,
       kind: escolha.kind,
@@ -179,7 +180,7 @@ export function LinkPage() {
             setEscolha(e)
           }}
           onVoltar={() => setPasso('identificacao')}
-          onAvancar={() => setPasso(escolha.kind === 'addons_only' ? 'adicionais' : 'pratos')} />
+          onAvancar={() => setPasso('pratos')} />
       )}
 
       {passo === 'pratos' && (
@@ -191,7 +192,7 @@ export function LinkPage() {
       {passo === 'adicionais' && (
         <PassoAdicionais t={t} lang={lang} catalogo={cat} escolha={escolha}
           addons={addons} setAddons={setAddons}
-          onVoltar={() => setPasso(escolha.kind === 'addons_only' ? 'plano' : 'pratos')}
+          onVoltar={() => setPasso('pratos')}
           onAvancar={() => setPasso('revisao')} />
       )}
 

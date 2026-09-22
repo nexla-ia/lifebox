@@ -33,7 +33,8 @@ export function PassoRevisao({
     let cancelado = false
     setErroPreco(null)
     void precificarLink({
-      kind: escolha.kind, plan_id: escolha.plan_id, size_id: escolha.size_id, items: itens,
+      kind: escolha.kind, plan_id: escolha.plan_id, size_id: escolha.size_id,
+      fulfillment: dados.fulfillment, items: itens,
     }).then(({ data, error }) => {
       if (cancelado) return
       if (error || !data) {
@@ -46,7 +47,8 @@ export function PassoRevisao({
     })
     return () => { cancelado = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(itens), escolha.kind, escolha.plan_id, escolha.size_id])
+  }, [JSON.stringify(itens), escolha.kind, escolha.plan_id, escolha.size_id,
+      dados.fulfillment])
 
   const plano = catalogo.plans.find((p) => p.id === escolha.plan_id)
   const tamanho = catalogo.sizes.find((s) => s.id === escolha.size_id)
@@ -92,7 +94,8 @@ export function PassoRevisao({
       </h1>
 
       <Bloco titulo={t.plano} onEditar={() => onEditar('plano')} rotuloEditar={t.editar}>
-        {plano ? `${nome(plano, lang)}${tamanho ? ` · ${tamanho.name}` : ''}` : t.soDetox}
+        {plano ? `${nome(plano, lang)}${tamanho ? ` · ${tamanho.name}` : ''}`
+          : `${t.personalizado}${tamanho ? ` · ${tamanho.name}` : ''}`}
         {preco && preco.meals_extra + preco.breakfasts_extra > 0 && (
           <span className="text-late-text font-semibold">
             {' '}· +{preco.meals_extra + preco.breakfasts_extra} {t.extras}
@@ -108,7 +111,10 @@ export function PassoRevisao({
 
       <Bloco titulo={t.entregaE} onEditar={() => onEditar('adicionais')} rotuloEditar={t.editar}>
         {listaAddons && <>{listaAddons} · </>}
-        {dados.first_name} {dados.last_name} · {dados.street_address}, {dados.city}
+        {dados.first_name} {dados.last_name} ·{' '}
+        {dados.fulfillment === 'pickup'
+          ? t.retirada
+          : `${dados.street_address}, ${dados.city}`}
         {dados.payment_method_id && (
           <>
             {' · '}

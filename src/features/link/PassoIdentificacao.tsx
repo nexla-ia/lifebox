@@ -6,7 +6,7 @@ import {
   consultarZipAtendido, identificar, type CatalogoLink, type Identificacao,
 } from './api'
 import { nome, type Idioma, type Textos } from './i18n'
-import { Aviso, BotaoPrincipal, Campo, inputCls } from './ui'
+import { Aviso, BotaoPrincipal, Campo, Grupo, inputCls } from './ui'
 
 /* Passo 1 · telas 6e (número conhecido), 6g (primeira vez), 6f (validação de
  * área) e 6m (já tem pedido na semana).
@@ -23,6 +23,9 @@ import { Aviso, BotaoPrincipal, Campo, inputCls } from './ui'
 
 export type DadosCliente = {
   telefone: string           // E.164, já normalizado
+  /** §6.6 · reunião de 22/09/2026: quem retira não paga delivery, e não
+   *  precisa estar em ZIP atendido — o endereço deixa de ser obrigatório. */
+  fulfillment: 'delivery' | 'pickup'
   first_name: string
   last_name: string
   street_address: string
@@ -34,7 +37,7 @@ export type DadosCliente = {
 }
 
 export const CLIENTE_VAZIO: DadosCliente = {
-  telefone: '', first_name: '', last_name: '', street_address: '',
+  telefone: '', fulfillment: 'delivery', first_name: '', last_name: '', street_address: '',
   zip_code: '', city: '', delivery_notes: '', payment_method_id: '',
   conhecido: false,
 }
@@ -107,7 +110,7 @@ export function PassoIdentificacao({
         setEditandoEndereco(false)
         if (data.zip_code) void conferirZip(data.zip_code, false)
       } else {
-        setDados({ ...CLIENTE_VAZIO, telefone: e164 })
+        setDados({ ...CLIENTE_VAZIO, telefone: e164, fulfillment: dados.fulfillment })
         setEditandoEndereco(true)
         setZip({ estado: 'vazio' })
       }
@@ -126,7 +129,10 @@ export function PassoIdentificacao({
     if (gravarCidade) setDados({ ...dados, zip_code: z, city: data.city ?? '' })
   }
 
-  const enderecoOk = zip.estado === 'atende' && dados.street_address.trim() !== ''
+  const retira = dados.fulfillment === 'pickup'
+  // quem retira não precisa de endereço: o pedido não vai para rota nenhuma
+  const enderecoOk = retira
+    || (zip.estado === 'atende' && dados.street_address.trim() !== '')
   const podeAvancar =
     Boolean(normalizarTelefone(dados.telefone)) &&
     dados.first_name.trim() !== '' &&
@@ -148,7 +154,7 @@ export function PassoIdentificacao({
       {dados.conhecido && (
         <Aviso tom="ok">
           <strong>{t.ola}, {dados.first_name}! 👋</strong> {t.encontramos}
-          {!editandoEndereco && dados.street_address && (
+          {!retira && !editandoEndereco && dados.street_address && (
             <div className="mt-1.5">
               {t.entregaEm} {dados.street_address}
               {dados.city && `, ${dados.city}`} {dados.zip_code}
@@ -161,7 +167,9 @@ export function PassoIdentificacao({
         </Aviso>
       )}
 
-      {normalizarTelefone(dados.telefone) && !dados.conhecido && !buscando && (
+      {/* em retirada não se pede endereço, então prometer que ele será usado
+          para conferir a área seria pedir dado sem motivo */}
+      {normalizarTelefone(dados.telefone) && !dados.conhecido && !buscando && !retira && (
         <Aviso tom="info">
           <strong>{t.primeiraVez} 👋</strong> {t.primeiraVezAjuda}
         </Aviso>
@@ -182,7 +190,32 @@ export function PassoIdentificacao({
             </Campo>
           </div>
 
-          {editandoEndereco && (
+          <Grupo label={t.comoReceber}>
+            {(['delivery', 'pickup'] as const).map((f) => (
+              <button key={f} onClick={() => setDados({ ...dados, fulfillment: f })}
+                aria-pressed={dados.fulfillment === f}
+                aria-label={f === 'delivery' ? t.entrega : t.retirada}
+                className={`flex-1 min-w-36 rounded-lg px-4 py-2.5 text-[13px] border text-left ${
+                  dados.fulfillment === f
+                    ? 'bg-leaf-bg border-brand text-ink font-semibold'
+                    : 'bg-surface border-line-strong text-ink-2 hover:border-brand'}`}>
+                <span className="block">{f === 'delivery' ? t.entrega : t.retirada}</span>
+                <span className="block text-[11px] font-normal text-ink-3">
+                  {f === 'delivery' ? t.entregaAjuda : t.retiradaAjuda}
+                </span>
+              </button>
+            ))}
+          </Grupo>
+
+          {/* §6.6 quem retira não precisa de endereço nem de ZIP atendido */}
+          {retira && catalogo.pickup_window && (
+            <Aviso tom="info">
+              🏠 <strong>{t.janelaRetirada}:</strong>{' '}
+              {catalogo.pickup_window.start}–{catalogo.pickup_window.end}
+            </Aviso>
+          )}
+
+          {!retira && editandoEndereco && (
             <>
               <Campo label={t.endereco} obrigatorio>
                 <input value={dados.street_address} autoComplete="street-address"
@@ -207,16 +240,16 @@ export function PassoIdentificacao({
             </>
           )}
 
-          {zip.estado === 'conferindo' && (
+          {!retira && zip.estado === 'conferindo' && (
             <div className="text-[12px] text-ink-muted">{t.verificando}</div>
           )}
-          {zip.estado === 'atende' && (
+          {!retira && zip.estado === 'atende' && (
             <Aviso tom="ok">
               ✅ <strong>{t.entregamos}</strong>
               {zip.rota && <> · {zip.rota}</>}
             </Aviso>
           )}
-          {zip.estado === 'fora' && (
+          {!retira && zip.estado === 'fora' && (
             <Aviso tom="danger">
               ❌ <strong>{t.naoEntregamos}</strong>
               <div className="mt-1">{t.naoEntregamosAjuda}</div>
@@ -224,27 +257,26 @@ export function PassoIdentificacao({
             </Aviso>
           )}
 
-          <Campo label={`${t.notas} (${t.opcional})`}>
+          {!retira && <Campo label={`${t.notas} (${t.opcional})`}>
             <input value={dados.delivery_notes}
               onChange={(e) => setDados({ ...dados, delivery_notes: e.target.value })}
               className={inputCls} />
-          </Campo>
+          </Campo>}
 
           {catalogo.payment_methods.length > 0 && (
-            <Campo label={t.formaPagamento}>
-              <div className="flex gap-2 flex-wrap">
-                {catalogo.payment_methods.map((f) => (
-                  <button key={f.id}
-                    onClick={() => setDados({ ...dados, payment_method_id: f.id })}
-                    className={`rounded-lg px-4 py-2 text-[13px] border ${
-                      dados.payment_method_id === f.id
-                        ? 'bg-brand border-brand text-cream font-semibold'
-                        : 'bg-surface border-line-strong text-ink-2 hover:border-brand'}`}>
-                    {nome(f, lang)}
-                  </button>
-                ))}
-              </div>
-            </Campo>
+            <Grupo label={t.formaPagamento}>
+              {catalogo.payment_methods.map((f) => (
+                <button key={f.id}
+                  onClick={() => setDados({ ...dados, payment_method_id: f.id })}
+                  aria-pressed={dados.payment_method_id === f.id}
+                  className={`rounded-lg px-4 py-2 text-[13px] border ${
+                    dados.payment_method_id === f.id
+                      ? 'bg-brand border-brand text-cream font-semibold'
+                      : 'bg-surface border-line-strong text-ink-2 hover:border-brand'}`}>
+                  {nome(f, lang)}
+                </button>
+              ))}
+            </Grupo>
           )}
         </>
       )}

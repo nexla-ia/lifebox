@@ -117,6 +117,13 @@ vieram de quebrar de verdade:
 - **Estado que exige tabela vazia não se força.** Confira o estado que existe:
   esvaziar seria apagar dado real.
 
+**Não rode a suíte logo depois de aplicar DDL no Supabase.** O PostgREST
+recarrega o cache de schema quando a estrutura muda, e requisições nessa janela
+falham com "could not find the function in the schema cache" — um teste
+qualquer quebra e não reproduz depois. Aconteceu duas vezes, em specs
+diferentes, sempre logo após um deploy. Espere alguns segundos; não adicione
+retry, que mascararia flake de verdade.
+
 Os testes que gravam no Supabase limpam em **hook `afterAll`**, nunca em
 `try/finally`: quando um teste estoura o timeout o Playwright aborta o corpo e
 o `finally` não chega a rodar, deixando lixo no banco da cliente. Marcam tudo
@@ -312,7 +319,29 @@ semana. Cada caso tem SQLSTATE próprio (`LB400`, `LB409`, `LB422`, `LB423`,
 Rate limit: por **telefone** curto (6 consultas/10min, 3 pedidos/30min), por
 **IP** folgado (30 e 12). Quem varre cadastro troca de número, então quem barra
 é o IP — mas apertá-lo derruba cliente de verdade, que em rede de celular
-divide IP com muita gente.
+divide IP com muita gente. Quando ainda assim barrar quem não deveria,
+`fn_link_liberar_tentativas(chave)` solta um número e
+`fn_link_limpar_tentativas()` solta tudo (depois de um disparo de campanha,
+por exemplo). O e2e usa a segunda: uma rodada faz dezenas de identificações da
+mesma máquina e estoura o teto por IP.
+
+**O link é só de quem vai RECEBER ou RETIRAR, e as duas coisas seguem regras
+diferentes.** Pick-up não cobra delivery (§6.6) e não passa pelo ZIP: exigir
+área de entrega de quem se dispôs a buscar recusava pedido que a LifeBox
+consegue atender. Em pick-up o endereço do cadastro também não é sobrescrito —
+a pessoa pode retirar esta semana e receber na próxima.
+
+**Tamanho antes do plano** (reunião de 22/09/2026): o preço de cada plano
+depende do tamanho, então perguntar o plano primeiro era escolher no escuro.
+Os planos só aparecem depois do tamanho, já com o preço daquela pessoa.
+
+**Breakfast só para plano que tem breakfast**, e "Só Detox / adicionais" saiu
+das opções: Detox virou adicional dentro de um plano.
+
+**Grupo de botões não vai dentro de `<label>`** (`Grupo` em `link/ui.tsx`). O
+label envolvendo botões cola o texto dela no nome acessível de CADA um —
+"Como você quer receber? 🏠 Retirar…" — e aí dois botões diferentes casam com
+o mesmo texto. Some no leitor de tela e quebra busca por nome.
 
 `name_snapshot` é sempre português, porque é o que a cozinha lê (§5.5). Na
 revisão do link o **rótulo** sai do catálogo no idioma da tela e só o **valor**

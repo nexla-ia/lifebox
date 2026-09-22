@@ -193,17 +193,16 @@ passar a confirmar sozinho.
 
 ---
 
-## 12. Retirada pelo link público
+## 12. Retirada pelo link público ✅ resolvido
 
-**Como estamos agora:** o link público **só faz entrega**.
+**Resolvido na reunião de 22/09/2026:** o cliente escolhe no próprio link se
+vai **receber** ou **retirar**.
 
-As telas aprovadas do link pedem o endereço em todos os caminhos e bloqueiam
-quem está fora da área (6f); retirada não aparece em nenhuma delas. Então quem
-quiser retirar combina com vocês pelo WhatsApp, e a equipe lança o pedido como
-pick-up pela tela da Semana — que já faz isso.
+Quem retira não paga a taxa de entrega e **não precisa estar numa região
+atendida** — faz sentido: quem se dispôs a buscar não deveria ser recusado por
+morar longe. A tela mostra o horário de retirada que está em Configurações.
 
-Se vocês quiserem que o próprio cliente escolha retirada no link, é uma opção
-a mais no primeiro passo. Digam que entra.
+Quem vai receber continua preso ao ZIP, como antes.
 
 ---
 

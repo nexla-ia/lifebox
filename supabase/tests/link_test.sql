@@ -248,7 +248,30 @@ begin
   perform assert_eq(jsonb_array_length(r->'pedidos'), 2,
                     'a tela lista os dois pedidos da semana');
 
-  raise notice 'ZIP fora da area bloqueia o pedido (tela 6f)';
+  raise notice 'quem RETIRA nao precisa de ZIP atendido (§6.6)';
+  declare r_pk jsonb; v_pk uuid; begin
+    r_pk := fn_link_criar_pedido(jsonb_build_object(
+      'phone','+15550100007','first_name','Vou Retirar',
+      'zip_code','99999',            -- fora da area, e nao importa
+      'fulfillment','pickup',
+      'kind','plan','plan_id',v_plan,'size_id',v_s,
+      'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_d,'qty',5))));
+    perform assert_eq(r_pk->>'fulfillment', 'pickup', 'pedido de retirada');
+
+    select id into v_pk from orders where code = r_pk->>'code';
+    -- §6.6: pick-up nao cobra delivery, e e justamente isso que a tela promete
+    perform assert_eq((select delivery_cents from orders where id = v_pk), 0,
+                      'sem taxa de entrega');
+    perform assert_eq((select total_cents from orders where id = v_pk)
+                      < (select total_cents from orders
+                          where customer_id = v_cli order by code limit 1),
+                      true, 'sai mais barato que o mesmo pedido com entrega');
+    perform assert_eq((select fulfillment_preference from customers
+                        where phone_e164 = '+15550100007')::text,
+                      'pickup', 'preferencia gravada no cadastro');
+  end;
+
+  raise notice 'mas quem vai RECEBER continua preso ao ZIP (tela 6f)';
   begin
     perform fn_link_criar_pedido(jsonb_build_object(
       'phone','+15550100004','first_name','Fora','zip_code','99999',

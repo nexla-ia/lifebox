@@ -118,6 +118,11 @@ test.describe('overview', () => {
     await entrar(page)
     await page.getByRole('button', { name: 'Mês', exact: true }).click()
 
+    // esperar o PERÍODO trocar antes de ler o número: entre o clique e a
+    // resposta a tela mostra o mês com zero, e ler ali dava falha intermitente
+    // que não era bug nenhum
+    await expect(page.getByText(/^\w+\.? de \d{4}$/)).toBeVisible({ timeout: 20_000 })
+
     // o mês contém a semana do pedido, então o faturamento é pelo menos o dele
     await expect(page.getByLabel('Faturamento', { exact: true }))
       .toContainText('$', { timeout: 20_000 })

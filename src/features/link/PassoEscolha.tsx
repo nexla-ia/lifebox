@@ -12,7 +12,10 @@ import { Aviso, BotaoPrincipal, Chip, Contador, Foto, Voltar } from './ui'
  * catálogo, não de conta feita aqui. */
 
 export type Escolha = {
-  kind: 'plan' | 'custom' | 'addons_only'
+  /** `addons_only` saiu do link na reunião de 22/09/2026: Detox virou adicional
+   *  dentro de um plano, não um tipo de pedido. A equipe ainda lança pelo
+   *  sistema quando precisar. */
+  kind: 'plan' | 'custom'
   plan_id: string | null
   size_id: string | null
 }
@@ -37,6 +40,14 @@ export function itensDoPedido(pratos: MapaQtd, addons: MapaQtd) {
 }
 
 // ------------------------------------------------------------- passo 2 · 6a
+/** Tamanho ANTES do plano (reunião de 22/09/2026).
+ *
+ *  O preço do plano muda com o tamanho, então perguntar o plano primeiro
+ *  obrigava a escolher no escuro e voltar. Com o tamanho definido, cada plano
+ *  já mostra quanto custa PARA ESSA PESSOA.
+ *
+ *  "Só Detox / adicionais" saiu das opções de plano na mesma reunião: Detox
+ *  virou adicional que entra dentro de um plano, não um tipo de pedido. */
 export function PassoPlano({
   t, lang, catalogo, escolha, setEscolha, onAvancar, onVoltar,
 }: {
@@ -48,17 +59,14 @@ export function PassoPlano({
     p.prices.find((x) => x.size_id === sizeId)?.base_price_cents ?? null
 
   const temPersonalizado = catalogo.custom_prices.length > 0
-  const temAddons = catalogo.addons.some((a) => !a.requires_plan)
 
   // §5.1 o tamanho vale para o plano inteiro; só oferecemos os que têm preço
-  const tamanhosComPreco = catalogo.sizes.filter((s) =>
+  const tamanhos = catalogo.sizes.filter((s) =>
     escolha.kind === 'custom'
       ? catalogo.custom_prices.some((c) => c.size_id === s.id)
       : catalogo.plans.some((p) => p.prices.some((x) => x.size_id === s.id)))
 
-  const precisaTamanho = escolha.kind === 'plan' || escolha.kind === 'custom'
   const podeAvancar =
-    escolha.kind === 'addons_only' ||
     (escolha.kind === 'custom' && Boolean(escolha.size_id)) ||
     (escolha.kind === 'plan' && Boolean(escolha.plan_id) && Boolean(escolha.size_id) &&
       precoDe(catalogo.plans.find((p) => p.id === escolha.plan_id)!, escolha.size_id) !== null)
@@ -68,82 +76,75 @@ export function PassoPlano({
       <Voltar onClick={onVoltar}>{t.voltar}</Voltar>
       <h1 className="text-[19px] font-bold text-brand">{t.p2Titulo}</h1>
 
-      <div className="flex flex-col gap-2">
-        {catalogo.plans.map((p) => {
-          const sel = escolha.kind === 'plan' && escolha.plan_id === p.id
-          return (
-            <button key={p.id}
-              onClick={() => setEscolha({ ...escolha, kind: 'plan', plan_id: p.id })}
-              aria-pressed={sel}
-              className={`text-left rounded-xl border px-4 py-3 ${
-                sel ? 'border-brand bg-leaf-bg' : 'border-line bg-surface hover:border-brand'}`}>
-              <div className="flex items-center gap-2">
-                <span className="text-[14.5px] font-bold text-ink">{nome(p, lang)}</span>
-                {sel && <span className="text-brand font-bold">✓</span>}
-              </div>
-              <div className="text-[12px] text-ink-3">
-                {p.meals_qty > 0 && `${p.meals_qty} ${t.refeicoes}`}
-                {p.meals_qty > 0 && p.breakfasts_qty > 0 && ' + '}
-                {p.breakfasts_qty > 0 && `${p.breakfasts_qty} ${t.breakfasts}`}
-                {' '}{t.aEscolher}
-              </div>
-            </button>
-          )
-        })}
-
-        {temAddons && (
-          <button onClick={() => setEscolha({ kind: 'addons_only', plan_id: null, size_id: null })}
-            aria-pressed={escolha.kind === 'addons_only'}
-            className={`text-left rounded-xl border px-4 py-3 ${
-              escolha.kind === 'addons_only'
-                ? 'border-accent bg-accent-bg' : 'border-line bg-surface hover:border-accent'}`}>
-            <div className="text-[14.5px] font-bold text-ink">🧃 {t.soDetox}</div>
-            <div className="text-[12px] text-ink-3">{t.soDetoxAjuda}</div>
-          </button>
-        )}
-
-        {temPersonalizado && (
-          <button onClick={() => setEscolha({ kind: 'custom', plan_id: null, size_id: null })}
-            aria-pressed={escolha.kind === 'custom'}
-            className={`text-left rounded-xl border px-4 py-3 ${
-              escolha.kind === 'custom'
-                ? 'border-brand bg-leaf-bg' : 'border-line bg-surface hover:border-brand'}`}>
-            <div className="text-[14.5px] font-bold text-ink">✎ {t.personalizado}</div>
-            <div className="text-[12px] text-ink-3">{t.personalizadoAjuda}</div>
-          </button>
-        )}
-      </div>
-
-      {precisaTamanho && tamanhosComPreco.length > 0 && (
+      {tamanhos.length > 0 && (
         <div className="flex flex-col gap-1.5">
           <span className="text-[12px] font-semibold text-ink-2">{t.tamanho}</span>
           <div className="flex gap-2 flex-wrap">
-            {tamanhosComPreco.map((s) => {
-              const plano = catalogo.plans.find((p) => p.id === escolha.plan_id)
-              const preco = escolha.kind === 'plan' && plano ? precoDe(plano, s.id) : null
-              return (
-                <button key={s.id} onClick={() => setEscolha({ ...escolha, size_id: s.id })}
-                  aria-pressed={escolha.size_id === s.id}
-                  className={`rounded-lg px-4 py-2 text-[13px] border ${
-                    escolha.size_id === s.id
-                      ? 'bg-brand border-brand text-cream font-semibold'
-                      : 'bg-surface border-line-strong text-ink-2 hover:border-brand'}`}>
-                  {s.name}
-                  {preco !== null && (
-                    <span className="ml-2 opacity-80 tnum">{money(preco)}</span>
-                  )}
-                </button>
-              )
-            })}
+            {tamanhos.map((s) => (
+              <button key={s.id} onClick={() => setEscolha({ ...escolha, size_id: s.id })}
+                aria-pressed={escolha.size_id === s.id}
+                className={`rounded-lg px-5 py-2.5 text-[13.5px] border ${
+                  escolha.size_id === s.id
+                    ? 'bg-brand border-brand text-cream font-semibold'
+                    : 'bg-surface border-line-strong text-ink-2 hover:border-brand'}`}>
+                {s.name}
+              </button>
+            ))}
           </div>
           <span className="text-[11px] text-ink-muted">{t.tamanhoNota}</span>
+        </div>
+      )}
+
+      {/* os planos só aparecem depois do tamanho: sem ele o preço de cada um
+          seria um chute, e a pessoa teria de voltar para conferir */}
+      {escolha.size_id && (
+        <div className="flex flex-col gap-2">
+          {catalogo.plans.map((p) => {
+            const sel = escolha.kind === 'plan' && escolha.plan_id === p.id
+            const preco = precoDe(p, escolha.size_id)
+            if (preco === null) return null
+            return (
+              <button key={p.id}
+                onClick={() => setEscolha({ ...escolha, kind: 'plan', plan_id: p.id })}
+                aria-pressed={sel}
+                className={`text-left rounded-xl border px-4 py-3 flex items-center gap-3 ${
+                  sel ? 'border-brand bg-leaf-bg' : 'border-line bg-surface hover:border-brand'}`}>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[14.5px] font-bold text-ink">{nome(p, lang)}</span>
+                    {sel && <span className="text-brand font-bold">✓</span>}
+                  </div>
+                  <div className="text-[12px] text-ink-3">
+                    {p.meals_qty > 0 && `${p.meals_qty} ${t.refeicoes}`}
+                    {p.meals_qty > 0 && p.breakfasts_qty > 0 && ' + '}
+                    {p.breakfasts_qty > 0 && `${p.breakfasts_qty} ${t.breakfasts}`}
+                    {' '}{t.aEscolher}
+                  </div>
+                </div>
+                <span className="text-[14px] font-bold text-brand-mid tnum whitespace-nowrap">
+                  {money(preco)}
+                </span>
+              </button>
+            )
+          })}
+
+          {temPersonalizado && (
+            <button onClick={() => setEscolha({ ...escolha, kind: 'custom', plan_id: null })}
+              aria-pressed={escolha.kind === 'custom'}
+              className={`text-left rounded-xl border px-4 py-3 ${
+                escolha.kind === 'custom'
+                  ? 'border-brand bg-leaf-bg' : 'border-line bg-surface hover:border-brand'}`}>
+              <div className="text-[14.5px] font-bold text-ink">✎ {t.personalizado}</div>
+              <div className="text-[12px] text-ink-3">{t.personalizadoAjuda}</div>
+            </button>
+          )}
         </div>
       )}
 
       {escolha.kind === 'custom' && <Aviso tom="info">✎ {t.personalizadoNota}</Aviso>}
 
       <BotaoPrincipal onClick={onAvancar} disabled={!podeAvancar}>
-        {escolha.kind === 'addons_only' ? t.verAdicionais : t.escolherPratos}
+        {t.escolherPratos}
       </BotaoPrincipal>
     </div>
   )
@@ -169,9 +170,18 @@ export function PassoPratos({
     return [...m.values()]
   }, [catalogo.dishes])
 
+
+  /** Breakfast só aparece para plano que tem breakfast (reunião de
+   *  22/09/2026): oferecer o que não entra no plano é convidar a escolher
+   *  errado e descobrir na revisão, quando vira extra. No Personalizado tudo
+   *  aparece, porque ali cada item é cobrado por unidade. */
+  const doPlano = custom || (plano?.breakfasts_qty ?? 0) > 0
+    ? catalogo.dishes
+    : catalogo.dishes.filter((d) => d.category !== 'breakfast')
+
   const visiveis = filtro
-    ? catalogo.dishes.filter((d) => d.tags.some((tg) => tg.code === filtro))
-    : catalogo.dishes
+    ? doPlano.filter((d) => d.tags.some((tg) => tg.code === filtro))
+    : doPlano
 
   // contagem só para o progresso e para o aviso de extra — preço é do servidor
   const conta = (bkf: boolean) =>

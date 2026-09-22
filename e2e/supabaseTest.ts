@@ -405,3 +405,33 @@ export async function lerItensProducao(): Promise<number> {
   const linhas = (await r.json()) as { qty: number }[]
   return linhas.reduce((s, l) => s + Number(l.qty ?? 0), 0)
 }
+
+/** Zera o rate limit do link para um número.
+ *
+ *  O spec do link roda seis identificações com o mesmo telefone, que é
+ *  exatamente o teto por 10 minutos — rodar duas vezes seguidas trombava no
+ *  próprio limite. Usa a mesma função que a equipe usa quando um cliente liga
+ *  dizendo que não consegue pedir. */
+export async function liberarTentativas(chave: string) {
+  const c = await conectar()
+  if (!c) return
+  await fetch(`${c.url}/rest/v1/rpc/fn_link_liberar_tentativas`, {
+    method: 'POST',
+    headers: { apikey: c.key, Authorization: `Bearer ${c.token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_chave: chave }),
+  })
+}
+
+/** Zera o controle inteiro. O limite por IP é o que trava a suíte: uma rodada
+ *  completa faz dezenas de identificações da mesma máquina, e rodar duas vezes
+ *  em dez minutos estoura o teto. Mesma função que a equipe usa depois de um
+ *  disparo de campanha. */
+export async function limparTentativas() {
+  const c = await conectar()
+  if (!c) return
+  await fetch(`${c.url}/rest/v1/rpc/fn_link_limpar_tentativas`, {
+    method: 'POST',
+    headers: { apikey: c.key, Authorization: `Bearer ${c.token}`, 'Content-Type': 'application/json' },
+    body: '{}',
+  })
+}
