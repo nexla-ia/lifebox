@@ -59,9 +59,14 @@ begin
   perform assert_eq((select total_cents from orders where id = v_o), 15910, 'gravado no pedido');
 
   raise notice 'codigo do pedido';
-  perform assert_eq(r->>'code',
-                    substring((select iso_code from weeks where id = v_w) from 6) || '-0001',
-                    'primeiro da semana');
+  -- Nao se prende o NUMERO. Rodando contra o banco da cliente a semana ja tem
+  -- pedido de verdade, e "-0001" so passaria em banco vazio — o teste
+  -- quebraria sem haver bug, que e o pior jeito de perder confianca na suite.
+  -- A regra e o formato e a sequencia DENTRO da semana; e isso que se prova.
+  perform assert_eq(
+    r->>'code' ~ ('^' || substring((select iso_code from weeks where id = v_w) from 6)
+                      || '-[0-9]{4}$'),
+    true, 'codigo no formato Wnn-NNNN da semana');
 
   raise notice 'itens com snapshot';
   perform assert_eq((select sum(qty)::int from order_items
@@ -89,8 +94,10 @@ begin
   -- O risco nao e o segundo pedido existir, e ele sumir do dinheiro: a versao
   -- anterior de v_week_summary somava atravessando customer_weeks.order_id,
   -- que aponta para um pedido so.
-  declare v_total_antes int; v_pedidos_antes int; r2 jsonb; begin
-    select pedidos_cents, total_pedidos into v_total_antes, v_pedidos_antes
+  declare v_total_antes int; v_pedidos_antes int; v_clientes_antes int; r2 jsonb;
+  begin
+    select pedidos_cents, total_pedidos, clientes_com_pedido
+      into v_total_antes, v_pedidos_antes, v_clientes_antes
       from v_week_summary where week_id = v_w;
 
     r2 := fn_create_order(jsonb_build_object(
@@ -98,6 +105,8 @@ begin
       'plan_id', v_plan, 'size_id', v_s,
       'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_meal,'qty',10))));
     perform assert_eq(r2->>'code' is not null, true, 'segundo pedido criado');
+    perform assert_eq(right(r2->>'code', 4)::int, right(r->>'code', 4)::int + 1,
+                      'o numero anda de um em um na semana');
     perform assert_eq((select count(*)::int from orders
                         where customer_id = v_c and week_id = v_w), 2, 'dois pedidos');
 
@@ -111,8 +120,11 @@ begin
     perform assert_eq((select count(*)::int from customer_weeks
                         where customer_id = v_c and week_id = v_w), 1,
                       'uma linha de status por pessoa');
+    -- diferenca, nao total: a semana pode ter cliente de verdade da LifeBox.
+    -- O que se prova e que o SEGUNDO pedido nao cria um segundo cliente.
     perform assert_eq((select clientes_com_pedido::int from v_week_summary
-                        where week_id = v_w), 1, 'um cliente, dois pedidos');
+                        where week_id = v_w), v_clientes_antes,
+                      'o segundo pedido NAO cria um segundo cliente');
   end;
 
   raise notice 'semana seguinte vira Renovacao';

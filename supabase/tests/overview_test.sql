@@ -133,17 +133,33 @@ begin
   mes  := fn_overview('month', '2026-09');
 
   raise notice 'MES = SOMA DAS SEMANAS (§10)';
-  perform assert_eq((mes->'faturamento'->>'total_cents')::int,
-                    (ov37->'faturamento'->>'total_cents')::int
-                    + (ov38->'faturamento'->>'total_cents')::int,
-                    'faturamento do mes fecha com as semanas');
-  perform assert_eq((mes->'pedidos'->>'total')::int,
-                    (ov37->'pedidos'->>'total')::int + (ov38->'pedidos'->>'total')::int,
-                    'pedidos do mes fecham com as semanas');
-  perform assert_eq((mes->'faturamento'->>'faturado_cents')::int,
-                    (ov37->'faturamento'->>'faturado_cents')::int
-                    + (ov38->'faturamento'->>'faturado_cents')::int,
-                    'faturado do mes fecha com as semanas');
+  -- Soma TODAS as semanas de setembro, nao so as duas da massa. Contra o banco
+  -- da cliente ha pedido real na W39, que e de setembro: comparar o mes com
+  -- W37+W38 falharia sem existir bug. E a regra do §10 e literalmente esta —
+  -- o mes fecha com a soma das semanas DELE, quaisquer que sejam.
+  declare v_fat int := 0; v_pago int := 0; v_ped int := 0; sem jsonb; w record;
+  begin
+    for w in select x.iso_code from fn_semanas_do_periodo('month','2026-09') f
+               join weeks x on x.id = f
+    loop
+      sem    := fn_overview('week', w.iso_code);
+      v_fat  := v_fat  + (sem->'faturamento'->>'total_cents')::int;
+      v_pago := v_pago + (sem->'faturamento'->>'faturado_cents')::int;
+      v_ped  := v_ped  + (sem->'pedidos'->>'total')::int;
+    end loop;
+
+    perform assert_eq((mes->'faturamento'->>'total_cents')::int, v_fat,
+                      'faturamento do mes fecha com as semanas');
+    perform assert_eq((mes->'pedidos'->>'total')::int, v_ped,
+                      'pedidos do mes fecham com as semanas');
+    perform assert_eq((mes->'faturamento'->>'faturado_cents')::int, v_pago,
+                      'faturado do mes fecha com as semanas');
+    -- e a massa deste teste esta dentro da conta, senao o laco acima poderia
+    -- estar somando zero com zero e passando a toa
+    perform assert_eq(v_fat >= (ov37->'faturamento'->>'total_cents')::int
+                             + (ov38->'faturamento'->>'total_cents')::int,
+                      true, 'W37 e W38 entram no mes');
+  end;
 
   raise notice 'Skip, Cancelamento e Parceria ficam fora do total (§6.4)';
   perform assert_eq((ov38->'pedidos'->>'total')::int, 2, 'W38: Ana e Carla');

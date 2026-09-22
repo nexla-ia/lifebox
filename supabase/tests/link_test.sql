@@ -356,10 +356,36 @@ begin
 
   reset role;
 
+  -- A LISTA do que o anon alcanca e curta e explicita. Este e o teste que
+  -- faltava: o Supabase concede EXECUTE de toda funcao nova ao role `anon` por
+  -- default privileges, entao `revoke from public` nao fecha nada la — e o
+  -- cluster local, que nao tem esses defaults, nao acusava. Funcao nova que
+  -- nao devia ser publica aparece aqui.
+  select array_agg(p.proname order by p.proname) into v_falhas
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public'
+     and has_function_privilege('anon', p.oid, 'execute')
+     and p.proname not in (
+       'fn_link_semana','fn_link_catalogo','fn_link_zip','fn_link_identificar',
+       'fn_link_precificar','fn_link_criar_pedido',
+       'fn_convite','fn_aceitar_convite',
+       -- a RLS chama estas tres, e a policy roda com o privilegio de QUEM
+       -- consulta: sem execute, o anon leva ERRO no lugar do resultado vazio.
+       -- Nao vazam nada — falam da sessao de quem chama, e sem JWT sao false.
+       'is_admin','is_staff','current_role_of',
+       -- `assert_eq` e o helper deste arquivo: nasce dentro do `begin` e some
+       -- no `rollback`, nunca existe no banco implantado. E e chamado COMO
+       -- anon logo acima, entao fecha-lo quebraria o proprio teste.
+       'assert_eq');
+  if coalesce(array_length(v_falhas, 1), 0) > 0 then
+    raise exception 'FALHOU: anon alcanca funcao que nao e do link: %',
+      array_to_string(v_falhas, ', ');
+  end if;
+  raise notice '  ok  so as funcoes do link e do convite abrem para o anon';
+
   if coalesce(array_length(v_falhas, 1), 0) > 0 then
     raise exception 'FALHOU: anon alcancou %', array_to_string(v_falhas, ', ');
   end if;
-  raise notice '  ok  anon nao le nem escreve tabela, e passa pelas funcoes do link';
   raise notice 'PORTA OK';
 end $anon$;
 
