@@ -122,6 +122,37 @@ begin
     raise notice '  ok  recusa telefone fora do E.164';
   end;
 
+  raise notice 'telefone: EUA e Brasil valem, o resto nao';
+  perform assert_eq(fn_telefone_valido('+15085550164'), true, 'EUA');
+  perform assert_eq(fn_telefone_valido('+5569992695898'), true, 'Brasil, celular com 9');
+  perform assert_eq(fn_telefone_valido('+551134567890'), true, 'Brasil, fixo');
+  perform assert_eq(fn_telefone_valido('+351912345678'), false, 'outro pais, nao');
+  perform assert_eq(fn_telefone_valido('15085550164'), false, 'sem o +, nao');
+  perform assert_eq(fn_telefone_valido('+1508555016'), false, 'EUA com digito a menos');
+
+  raise notice 'o link fecha pedido com numero do Brasil (§2)';
+  declare r_br jsonb; begin
+    r_br := fn_link_criar_pedido(jsonb_build_object(
+      'phone','+5569992695898','first_name','Brasileiro em Boston',
+      'street_address','1 Test St','zip_code','02118',
+      'kind','plan','plan_id',v_plan,'size_id',v_s,
+      'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_d,'qty',5))));
+    perform assert_eq(r_br->>'code' is not null, true, 'pedido criado');
+    perform assert_eq((select phone_e164 from customers where phone_e164 = '+5569992695898'),
+                      '+5569992695898', 'telefone gravado em E.164');
+    -- o webhook leva o numero como esta: e a chave do WhatsApp.
+    -- net.chamadas e o dubl� do stub local; no Supabase pg_net e real e nao
+    -- guarda o corpo enviado, entao o payload se confere aqui.
+    if to_regclass('net.chamadas') is not null then
+      perform assert_eq(
+        (select body->>'telefone' from net.chamadas
+          where body->>'code' = r_br->>'code'),
+        '+5569992695898', 'automacao recebe o numero do Brasil');
+    end if;
+  end;
+  perform assert_eq((fn_link_identificar('+5569992695898')->>'conhecido')::boolean, true,
+                    'e o numero do Brasil e reconhecido depois');
+
   raise notice 'pedido pelo link';
   r := fn_link_criar_pedido(jsonb_build_object(
     'phone','+15550100003','first_name','Cliente Link',
@@ -151,27 +182,38 @@ begin
                     'quem pediu deixa de ser primeiro contato (§6.2)');
 
   raise notice 'o pedido avisa a automacao, com a mensagem montada (§9.2)';
-  perform assert_eq((select count(*)::int from net.chamadas), 1, 'um disparo, um pedido');
-  perform assert_eq(
-    (select url from net.chamadas order by id desc limit 1),
-    (select value #>> '{}' from settings where key = 'webhook_order_confirmation'),
-    'foi para a URL do settings, nao para uma fixa no codigo');
-  perform assert_eq((select body->>'telefone' from net.chamadas order by id desc limit 1),
-                    '+15550100003', 'telefone em E.164, que e a chave do WhatsApp');
-  perform assert_eq((select body->>'code' from net.chamadas order by id desc limit 1) is not null,
-                    true, 'codigo do pedido no payload');
-  -- a mensagem e a que a LifeBox escreveu na tela 6p, ja preenchida
-  perform assert_eq(
-    (select position('{' in (body->>'mensagem')) from net.chamadas order by id desc limit 1),
-    0, 'nenhuma variavel sobrou por substituir');
-  perform assert_eq(
-    (select position((select code from orders where customer_id = v_cli)
-                     in (body->>'mensagem')) > 0
-       from net.chamadas order by id desc limit 1),
-    true, 'o numero do pedido entrou no texto');
-  perform assert_eq(
-    (select body->'variaveis'->>'total' from net.chamadas order by id desc limit 1),
-    '$95.60', 'total formatado como o cliente le');
+  if to_regclass('net.chamadas') is not null then
+    declare v_codigo text; begin
+      select code into v_codigo from orders where customer_id = v_cli;
+
+      -- um disparo POR PEDIDO, nao um disparo no total: outros pedidos do
+      -- proprio teste ja dispararam antes
+      perform assert_eq((select count(*)::int from net.chamadas
+                          where body->>'code' = v_codigo), 1, 'um disparo para este pedido');
+      perform assert_eq(
+        (select url from net.chamadas where body->>'code' = v_codigo),
+        (select value #>> '{}' from settings where key = 'webhook_order_confirmation'),
+        'foi para a URL do settings, nao para uma fixa no codigo');
+      perform assert_eq((select body->>'telefone' from net.chamadas
+                          where body->>'code' = v_codigo),
+                        '+15550100003', 'telefone em E.164, que e a chave do WhatsApp');
+      -- a mensagem e a que a LifeBox escreveu na tela 6p, ja preenchida
+      perform assert_eq(
+        (select position('{' in (body->>'mensagem')) from net.chamadas
+          where body->>'code' = v_codigo),
+        0, 'nenhuma variavel sobrou por substituir');
+      perform assert_eq(
+        (select position(v_codigo in (body->>'mensagem')) > 0 from net.chamadas
+          where body->>'code' = v_codigo),
+        true, 'o numero do pedido entrou no texto');
+      perform assert_eq(
+        (select body->'variaveis'->>'total' from net.chamadas
+          where body->>'code' = v_codigo),
+        '$95.60', 'total formatado como o cliente le');
+    end;
+  else
+    raise notice '  --  payload do webhook so no cluster local (aqui pg_net e real)';
+  end if;
 
   raise notice 'webhook fora do ar nao derruba o pedido';
   -- URL invalida: fn_notificar_pedido engole o erro e o pedido continua de pe

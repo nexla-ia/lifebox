@@ -19,6 +19,20 @@ describe('normalizarTelefone', () => {
     expect(normalizarTelefone('+5511987654321')).toBe('+5511987654321')
   })
 
+  // brasileiro recém-chegado em Boston costuma manter o número do Brasil no
+  // WhatsApp — e é o WhatsApp que cruza cliente e pedido (§2)
+  it('aceita número do Brasil, com ou sem o +', () => {
+    expect(normalizarTelefone('+55 69 99269-5898')).toBe('+5569992695898')
+    expect(normalizarTelefone('5569992695898')).toBe('+5569992695898')
+    expect(normalizarTelefone('55 11 3456-7890')).toBe('+551134567890')  // fixo
+  })
+
+  it('não chuta +55 em número curto: 10 dígitos continuam sendo dos EUA', () => {
+    // 551 é código de área de New Jersey; tratar como Brasil criaria cliente
+    // duplicado e sumiria com ele na automação
+    expect(normalizarTelefone('5512345678')).toBe('+15512345678')
+  })
+
   it('é idempotente — normalizar duas vezes não muda', () => {
     const uma = normalizarTelefone('(617) 555-0142')!
     expect(normalizarTelefone(uma)).toBe(uma)
@@ -40,8 +54,13 @@ describe('formatarTelefone', () => {
     expect(formatarTelefone('+15085550164')).toBe('(508) 555-0164')
   })
 
-  it('deixa internacional intacto', () => {
-    expect(formatarTelefone('+5511987654321')).toBe('+5511987654321')
+  it('mostra o do Brasil no formato de lá', () => {
+    expect(formatarTelefone('+5569992695898')).toBe('+55 (69) 99269-5898')
+    expect(formatarTelefone('+551134567890')).toBe('+55 (11) 3456-7890')
+  })
+
+  it('deixa outro país intacto', () => {
+    expect(formatarTelefone('+351912345678')).toBe('+351912345678')
   })
 })
 

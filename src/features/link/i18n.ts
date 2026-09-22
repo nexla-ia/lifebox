@@ -24,7 +24,8 @@ export const T = {
     // passo 1 · telas 6e, 6g
     p1Titulo: "Let's start with your details",
     whatsapp: 'WhatsApp',
-    whatsappAjuda: 'We use your number to find your account and send the order confirmation.',
+    whatsappAjuda:
+      'We use your number to find your account and send the order confirmation. US number, or Brazilian with 55 in front.',
     ola: 'Hi',
     encontramos: 'We found your account.',
     entregaEm: 'Delivery address:',
@@ -119,7 +120,7 @@ export const T = {
     falarWhats: 'Talk to us on WhatsApp',
 
     // erros
-    erroTelefone: 'Enter a valid US number, with area code.',
+    erroTelefone: 'Enter the number with area code — US, or Brazilian with 55 in front.',
     erroGenerico: 'Something went wrong. Please try again.',
     erroLimite: 'Too many attempts. Please wait a few minutes.',
     erroFechado: 'Orders for this week just closed.',
@@ -135,7 +136,8 @@ export const T = {
 
     p1Titulo: 'Vamos começar pelos seus dados',
     whatsapp: 'WhatsApp',
-    whatsappAjuda: 'Usamos seu número para achar seu cadastro e enviar a confirmação do pedido.',
+    whatsappAjuda:
+      'Usamos seu número para achar seu cadastro e enviar a confirmação do pedido. Número dos EUA, ou do Brasil com o 55 na frente.',
     ola: 'Olá',
     encontramos: 'Encontramos seu cadastro.',
     entregaEm: 'Entrega no endereço:',
@@ -223,7 +225,7 @@ export const T = {
     fechadoCorpo2: 'A próxima janela abre',
     falarWhats: 'Falar no WhatsApp',
 
-    erroTelefone: 'Digite um número dos EUA válido, com DDD.',
+    erroTelefone: 'Digite o número com DDD — dos EUA, ou do Brasil com o 55 na frente.',
     erroGenerico: 'Algo deu errado. Tente de novo.',
     erroLimite: 'Muitas tentativas. Aguarde alguns minutos.',
     erroFechado: 'Os pedidos desta semana acabaram de fechar.',

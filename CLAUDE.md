@@ -354,9 +354,17 @@ cliente e conversa do WhatsApp (§2). Errar aqui não dá erro visível: cria
 cliente duplicado e faz a automação do n8n não achar o pedido de quem mandou o
 comprovante.
 
+Dois países, e só dois: **EUA** (`+1` + 10 dígitos) e **Brasil** (`+55` + DDD +
+8 ou 9). O Brasil entrou porque quem chegou há pouco em Boston mantém o número
+de lá no WhatsApp — recusá-lo fechava a porta para parte do público. Quem
+valida no servidor é `fn_telefone_valido`; a entrega continua presa ao ZIP.
+
 `normalizarTelefone` **recusa** o que é ambíguo (7 ou 9 dígitos, 11 sem começar
 em 1) em vez de chutar código de país. A planilha real tem `(781) 518-6457`,
 `774-239-8922` e `7819291049` na mesma coluna — todos viram `+17815186457`.
+E **nunca se chuta `+55` em número curto**: 10 dígitos continuam sendo dos EUA,
+mesmo começando em 55 (551 é código de área de New Jersey). O Brasil só é
+reconhecido pelo tamanho, 12 ou 13 dígitos, que os EUA não têm.
 
 Ao apagar cliente pela API REST nos testes, **encode o telefone**: o `+` vira
 espaço numa query string e o filtro não casa.

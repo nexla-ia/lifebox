@@ -236,6 +236,24 @@ entrou — nos digam, porque muda os números do fechamento.
 
 ---
 
+## 15. Número de telefone do Brasil no link público
+
+**Como estamos agora:** o link aceita **número dos EUA** (+1 com DDD) **e do
+Brasil** (+55 com DDD). Qualquer outro país é recusado.
+
+O Brasil entrou porque quem chegou há pouco em Boston costuma manter o número
+de lá no WhatsApp — e é o WhatsApp que liga a pessoa ao pedido e ao
+comprovante. Recusar esse número fecharia a porta para parte do público de
+vocês.
+
+A **entrega** não muda: o endereço continua tendo que estar numa região
+atendida. O telefone é só o canal de conversa.
+
+Se aparecer cliente de outro país, é só dizer — cada país precisa da regra do
+formato dele, senão o sistema grava número que não existe.
+
+---
+
 ## Sobre o catálogo
 
 Pratos, planos, preços, adicionais, formas de pagamento e origens **não vêm

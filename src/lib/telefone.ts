@@ -26,17 +26,34 @@ export function normalizarTelefone(bruto: string): string | null {
   // 11 começando em 1 = EUA com código do país
   if (d.length === 11 && d.startsWith('1')) return `+${d}`
 
+  // 12 ou 13 começando em 55 = Brasil com código do país (55 + DDD + 8 ou 9).
+  // Não há ambiguidade: número dos EUA tem 10 ou 11 dígitos, nunca 12 nem 13.
+  // O que NÃO se faz é chutar +55 para número curto — 10 dígitos continuam
+  // sendo dos EUA, mesmo começando em 55 (551 é código de área de New Jersey).
+  if ((d.length === 12 || d.length === 13) && d.startsWith('55')) return `+${d}`
+
   // qualquer outro tamanho é ambíguo: pode ser erro de digitação ou número de
   // outro país sem o +. Recusar é mais seguro do que chutar o código do país.
   return null
 }
 
-/** +15085550164 → "(508) 555-0164". Número não americano volta como está,
- *  porque não sabemos o formato local dele. */
+/** +15085550164 → "(508) 555-0164"; +5569992695898 → "+55 (69) 99269-5898".
+ *  Outro país volta como está, porque não sabemos o formato local dele. */
 export function formatarTelefone(e164: string): string {
-  if (!e164?.startsWith('+1') || e164.length !== 12) return e164 ?? ''
-  const d = e164.slice(2)
-  return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`
+  const v = e164 ?? ''
+  if (v.startsWith('+1') && v.length === 12) {
+    const d = v.slice(2)
+    return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`
+  }
+  // Brasil: +55 DDD e 8 ou 9 dígitos. O cliente brasileiro que manteve o
+  // número de lá aparece assim na ficha e na folha de montagem.
+  if (v.startsWith('+55') && (v.length === 13 || v.length === 14)) {
+    const d = v.slice(3)
+    const ddd = d.slice(0, 2)
+    const resto = d.slice(2)
+    return `+55 (${ddd}) ${resto.slice(0, resto.length - 4)}-${resto.slice(-4)}`
+  }
+  return v
 }
 
 /** Link direto para a conversa no WhatsApp (tela 4b). */
