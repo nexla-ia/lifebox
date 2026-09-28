@@ -65,7 +65,7 @@ export async function fetchPainel(weekId: string, isoCode: string) {
       .select(`
         customer_id, order_status,
         customers!inner(first_name, last_name, phone_e164, routes(name)),
-        orders(id, code, total_cents, payment_status, post_cutoff,
+        orders(id, code, total_cents, payment_status, post_cutoff, phone_e164,
                plans(name_pt),
                sizes!orders_size_id_fkey(code),
                payment_methods(name_pt))
@@ -87,7 +87,7 @@ export async function fetchPainel(weekId: string, isoCode: string) {
     }
     orders: {
       id: string; code: string; total_cents: number; payment_status: string
-      post_cutoff: boolean
+      post_cutoff: boolean; phone_e164: string | null
       plans: { name_pt: string } | null
       sizes: { code: string } | null
       payment_methods: { name_pt: string } | null
@@ -103,7 +103,10 @@ export async function fetchPainel(weekId: string, isoCode: string) {
         customer_id: l.customer_id,
         order_status: l.order_status,
         cliente: `${l.customers.first_name} ${l.customers.last_name ?? ''}`.trim(),
-        telefone: l.customers.phone_e164,
+        // o número PARA ONDE a confirmação daquele pedido foi. É nessa conversa
+        // que o comprovante chega, e é ela que a equipe abre para conferir —
+        // o cadastro pode ter mudado de número desde então.
+        telefone: l.orders?.phone_e164 ?? l.customers.phone_e164,
         rota: l.customers.routes?.name ?? null,
         order: l.orders
           ? {

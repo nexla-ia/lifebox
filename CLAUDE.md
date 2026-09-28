@@ -288,6 +288,12 @@ depende de papel precisa de guard explícito no servidor, senão a Operação
 comprovante checa o destinatário (§9.3): chave faltando manda o comprovante
 para a fila manual.
 
+**A imagem do comprovante não é guardada** (decisão da LifeBox, 28/09/2026):
+encheria o banco. Quem confere abre a conversa do WhatsApp e olha lá — por isso
+o cartão do quadro traz o telefone do PEDIDO, com link `wa.me` e botão de
+copiar. É o número para onde a confirmação foi, não o do cadastro, que pode ter
+mudado desde então.
+
 Template de mensagem **não faz reload depois de salvar**: `useQuery.reload`
 volta a `loading` e a aba inteira vira skeleton — num formulário, o texto some,
 o cursor se perde e a confirmação nem aparece.

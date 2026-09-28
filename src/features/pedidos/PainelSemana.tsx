@@ -396,6 +396,52 @@ const PROXIMO: Record<string, string> = {
   comprovante_recebido: 'confirmado',
 }
 
+/** Número do pedido, para abrir a conversa e conferir o comprovante.
+ *
+ *  A LifeBox decidiu NÃO guardar a imagem do comprovante no banco (28/09/2026):
+ *  quem confere abre o WhatsApp e olha lá. Então o número tem de estar à mão no
+ *  cartão — sem ele a conferência vira procurar a pessoa na agenda pelo nome.
+ *
+ *  Copiar existe porque o `wa.me` nem sempre resolve: no computador ele abre o
+ *  WhatsApp Web, que pode não estar logado, e quem usa o aplicativo do celular
+ *  prefere colar na busca. */
+function Telefone({ e164 }: { e164: string }) {
+  const [copiado, setCopiado] = useState(false)
+
+  return (
+    <div className="flex items-center gap-1.5 mt-1">
+      <a
+        href={linkWhatsApp(e164)}
+        target="_blank"
+        rel="noreferrer"
+        title="Abrir a conversa no WhatsApp"
+        className="text-[11px] text-brand-mid hover:underline tnum"
+      >
+        {formatarTelefone(e164)}
+      </a>
+      <button
+        type="button"
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(e164)
+            setCopiado(true)
+            setTimeout(() => setCopiado(false), 1500)
+          } catch {
+            // navegador sem permissão de área de transferência (ou sem HTTPS):
+            // o número continua visível e selecionável ao lado, então não há
+            // o que consertar aqui além de não fingir que copiou
+            setCopiado(false)
+          }
+        }}
+        aria-label={`Copiar telefone ${formatarTelefone(e164)}`}
+        className="text-[10px] text-ink-muted hover:text-ink-2 border border-line rounded px-1.5 py-0.5"
+      >
+        {copiado ? 'copiado' : 'copiar'}
+      </button>
+    </div>
+  )
+}
+
 function CartaoPedido({
   linha, coluna, onMudou, onAbrir,
 }: {
@@ -441,6 +487,10 @@ function CartaoPedido({
           .filter(Boolean).join(' · ') || formatarTelefone(linha.telefone)}
       </div>
       </button>
+      {/* O telefone fica FORA do botão da ficha: link dentro de botão é HTML
+          inválido e o clique vira loteria de qual dos dois disparou. É o
+          número DO PEDIDO — a conversa em que o comprovante chegou. */}
+      {linha.order && linha.telefone && <Telefone e164={linha.telefone} />}
       {proximo && (
         <button
           disabled={ocupado}

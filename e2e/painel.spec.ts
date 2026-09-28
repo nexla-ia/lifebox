@@ -111,6 +111,28 @@ test.describe('painel da semana', () => {
     await expect(cartao.getByRole('button', { name: /→ Comprovante recebido/ })).toBeVisible()
   })
 
+  // A LifeBox decidiu não guardar a imagem do comprovante (28/09/2026): quem
+  // confere abre a conversa no WhatsApp. Então o número precisa estar no
+  // cartão, e precisa ser o DO PEDIDO — a conversa em que o comprovante caiu.
+  test('o cartão traz o telefone do pedido, com link do WhatsApp e copiar',
+    async ({ page }) => {
+      await entrar(page)
+      const cartao = cartaoNoQuadro(page)
+      await expect(cartao).toBeVisible({ timeout: 20_000 })
+
+      const digitos = fx!.telefone.replace(/\D/g, '')
+      await expect(cartao.getByRole('link'))
+        .toHaveAttribute('href', `https://wa.me/${digitos}`)
+
+      // o link abre em aba nova: a equipe não perde a semana de vista
+      await expect(cartao.getByRole('link')).toHaveAttribute('target', '_blank')
+
+      // e o botão de copiar tem nome acessível próprio — "copiar" sozinho não
+      // diz copiar o quê quando há vários cartões na tela
+      await expect(cartao.getByRole('button', { name: /Copiar telefone/ }))
+        .toBeVisible()
+    })
+
   test('avança o pagamento pelo quadro até confirmado', async ({ page }) => {
     await entrar(page)
 
