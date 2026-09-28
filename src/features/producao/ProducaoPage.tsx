@@ -25,6 +25,19 @@ const CATEGORIAS: Record<string, string> = {
   breakfast: 'Breakfast',
 }
 
+/* As cores são as mesmas da folha de Montagem (reunião de 22/09/2026), e é de
+ * propósito que sejam: quem conta na bancada é quem monta a sacola depois, e
+ * duas convenções de cor na mesma cozinha viram nenhuma.
+ *
+ *   Large  alaranjado · Small  preto · Menu Brasileiro  verde
+ *
+ * Aqui o verde vale para o bloco inteiro, e não sob condição: na Montagem ele
+ * marca a mistura dentro de UM pedido; aqui a folha já vem separada por menu,
+ * e o bloco é a própria divisão. */
+const corDoTamanho = (t: string) =>
+  t === 'L' ? 'text-late-text' : 'text-ink'
+const ehBrasileiro = (categoria: string) => categoria === 'brasileiro'
+
 export function ProducaoPage() {
   const { profile } = useAuth()
   const ehCozinha = profile?.role === 'cozinha'
@@ -159,6 +172,17 @@ function Agregada({ weekId, ehCozinha }: { weekId: string; ehCozinha: boolean })
         ))}
       </div>
 
+      {/* A legenda vai JUNTO, e também no papel: a folha impressa sai da mão de
+          quem conhece a convenção e vai parar na bancada. Sem ela a cor vira
+          enfeite — ou pior, cada um inventa um significado. */}
+      <p className={`text-[11.5px] flex gap-3 flex-wrap ${
+        ehCozinha ? 'text-black/70' : 'text-ink-muted'}`}>
+        <span><strong className="text-late-text">Large</strong> alaranjado</span>
+        <span><strong className={ehCozinha ? 'text-black' : 'text-ink'}>Small</strong> preto</span>
+        <span><strong className="text-leaf">Menu Brasileiro</strong> verde</span>
+        <span className="print:hidden">— as mesmas cores da folha de Montagem.</span>
+      </p>
+
       <p className={`text-[11.5px] ${ehCozinha ? 'text-black/60' : 'text-ink-muted'}`}>
         Detox e sucos não entram na folha — saem do estoque, não da produção.
       </p>
@@ -177,7 +201,8 @@ function Bloco({
   if (ehCozinha) {
     return (
       <div className="border-2 border-black rounded-lg overflow-hidden break-inside-avoid">
-        <div className="flex justify-between items-center px-3.5 py-2.5 bg-black">
+        <div className={`flex justify-between items-center px-3.5 py-2.5 ${
+          ehBrasileiro(grupo.categoria) ? 'bg-leaf' : 'bg-black'}`}>
           <span className="text-[14px] font-extrabold tracking-wide text-white uppercase">{titulo}</span>
           <span className="text-[12px] font-bold text-lime">{grupo.total}</span>
         </div>
@@ -194,11 +219,13 @@ function Bloco({
           <tbody>
             {grupo.itens.map((i) => (
               <tr key={i.prato}>
-                <td className="px-3 py-2 border-b border-black/25 text-[14.5px] font-semibold text-black leading-tight">
+                <td className={`px-3 py-2 border-b border-black/25 text-[14.5px] font-semibold leading-tight ${
+                  ehBrasileiro(grupo.categoria) ? 'text-leaf' : 'text-black'}`}>
                   {i.prato}
                 </td>
                 {tamanhos.map((t) => (
-                  <td key={t} className="text-center py-2 border-b border-black/25 text-[17px] font-extrabold text-black tnum">
+                  <td key={t} className={`text-center py-2 border-b border-black/25 text-[17px] font-extrabold tnum ${
+                    (i.porTamanho[t] ?? 0) === 0 ? 'text-black/30' : corDoTamanho(t)}`}>
                     {i.porTamanho[t] ?? 0}
                   </td>
                 ))}
@@ -210,7 +237,8 @@ function Bloco({
             <tr>
               <td className="px-3 py-2 text-[13px] font-extrabold text-black bg-black/10">TOTAL</td>
               {tamanhos.map((t) => (
-                <td key={t} className="text-center py-2 text-[17px] font-extrabold text-black bg-black/10 tnum">
+                <td key={t} className={`text-center py-2 text-[17px] font-extrabold bg-black/10 tnum ${
+                  corDoTamanho(t)}`}>
                   {grupo.totais[t] ?? 0}
                 </td>
               ))}
@@ -225,7 +253,8 @@ function Bloco({
   return (
     <div className="bg-surface border border-line rounded-xl overflow-hidden break-inside-avoid">
       <div className="flex justify-between items-center px-3.5 py-2.5 border-b border-line bg-surface-alt">
-        <span className="text-[13.5px] font-bold text-brand">{titulo}</span>
+        <span className={`text-[13.5px] font-bold ${
+          ehBrasileiro(grupo.categoria) ? 'text-leaf' : 'text-brand'}`}>{titulo}</span>
         <span className="bg-muted-bg text-ink-3 rounded-full px-2 py-0.5 text-[11px] font-semibold tnum">
           {tamanhos.map((t) => `${t} ${grupo.totais[t] ?? 0}`).join(' · ')}
         </span>
@@ -243,9 +272,13 @@ function Bloco({
         <tbody>
           {grupo.itens.map((i) => (
             <tr key={i.prato} className="hover:bg-cream/60">
-              <td className="px-3 py-1.5 border-b border-line-soft text-ink">{i.prato}</td>
+              <td className={`px-3 py-1.5 border-b border-line-soft ${
+                ehBrasileiro(grupo.categoria) ? 'text-leaf font-semibold' : 'text-ink'}`}>
+                {i.prato}
+              </td>
               {tamanhos.map((t) => (
-                <td key={t} className="text-center py-1.5 border-b border-line-soft text-ink-2 tnum">
+                <td key={t} className={`text-center py-1.5 border-b border-line-soft tnum font-semibold ${
+                  (i.porTamanho[t] ?? 0) === 0 ? 'text-line-strong' : corDoTamanho(t)}`}>
                   {i.porTamanho[t] ?? 0}
                 </td>
               ))}
@@ -292,16 +325,24 @@ function Notas({
 function Matriz({ weekId }: { weekId: string }) {
   const { data, loading, error, reload } = useQuery(() => fetchMatriz(weekId), [weekId])
 
-  const { clientes, pratos, celulas } = useMemo(() => {
+  const { clientes, pratos, celulas, categoriaDoPrato } = useMemo(() => {
     const cs = [...new Set((data ?? []).map((c) => c.cliente))].sort()
     const ps = [...new Set((data ?? []).map((c) => c.prato))].sort()
     const mapa = new Map<string, CelulaMatriz>()
     for (const c of data ?? []) {
       const k = `${c.prato}|${c.cliente}`
       const antes = mapa.get(k)
-      mapa.set(k, antes ? { ...antes, qty: antes.qty + c.qty } : c)
+      // Somar S com L na mesma célula apaga o tamanho, e colorir pelo primeiro
+      // que chegou mostraria uma cor que não corresponde ao número. Sem
+      // tamanho definido, a célula fica na cor neutra.
+      mapa.set(k, antes
+        ? { ...antes, qty: antes.qty + c.qty,
+            size_code: antes.size_code === c.size_code ? antes.size_code : null }
+        : c)
     }
-    return { clientes: cs, pratos: ps, celulas: mapa }
+    const cats = new Map<string, string>()
+    for (const c of data ?? []) if (c.category) cats.set(c.prato, c.category)
+    return { clientes: cs, pratos: ps, celulas: mapa, categoriaDoPrato: cats }
   }, [data])
 
   if (loading) return <Loading shape="rows" label="Montando a matriz…" />
@@ -348,14 +389,17 @@ function Matriz({ weekId }: { weekId: string }) {
         <tbody>
           {pratos.map((p) => (
             <tr key={p} className="hover:bg-cream/60">
-              <td className="sticky left-0 z-10 bg-surface px-3.5 py-1.5 border-b border-line-soft border-r border-line-soft whitespace-nowrap text-ink">
+              <td className={`sticky left-0 z-10 bg-surface px-3.5 py-1.5 border-b border-line-soft border-r border-line-soft whitespace-nowrap ${
+                categoriaDoPrato.get(p) === 'brasileiro' ? 'text-leaf font-semibold' : 'text-ink'}`}>
                 {p}
               </td>
               {clientes.map((c) => {
-                const q = celulas.get(`${p}|${c}`)?.qty ?? 0
+                const cel = celulas.get(`${p}|${c}`)
+                const q = cel?.qty ?? 0
                 return (
                   <td key={c} className={`text-center py-1.5 border-b border-line-soft tnum ${
-                    q ? 'text-ink' : 'text-line-strong'} ${posCutoff(c) ? 'bg-late-bg/50' : ''}`}>
+                    q ? `${corDoTamanho(cel?.size_code ?? '')} font-semibold` : 'text-line-strong'
+                  } ${posCutoff(c) ? 'bg-late-bg/50' : ''}`}>
                     {q || '·'}
                   </td>
                 )

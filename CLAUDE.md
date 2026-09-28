@@ -237,6 +237,14 @@ e das colunas S/L, e nada disso é sensível.
 Ordem das colunas de tamanho vem de `sizes.position`, **nunca** de sort
 alfabético: "L" < "S" inverteria Large e Small.
 
+**As cores são as mesmas da Montagem** — Large alaranjado, Small preto, Menu
+Brasileiro verde — e é de propósito: quem conta na bancada é quem monta a
+sacola depois, e duas convenções de cor na mesma cozinha viram nenhuma. A
+legenda vai na folha, inclusive impressa, senão a cor vira enfeite. Na Montagem
+o verde marca a mistura dentro de UM pedido; aqui a folha já vem separada por
+menu, então vale para o bloco inteiro. Célula da matriz que soma S com L perde
+a cor em vez de mostrar a do primeiro que chegou.
+
 ## Painel da Semana
 
 `v_week_summary` já aplica o §6.4: Total Pedidos = Novo + Renovação; Skip,

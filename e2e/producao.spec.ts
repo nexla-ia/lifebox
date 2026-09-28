@@ -60,6 +60,24 @@ test.describe('produção', () => {
     await expect(bkf).toContainText('5')
   })
 
+  // As cores são as mesmas da folha de Montagem, de propósito: quem conta na
+  // bancada é quem monta a sacola depois, e duas convenções na mesma cozinha
+  // viram nenhuma. A legenda vai junto, inclusive no papel.
+  test('a folha explica o código de cores, com as mesmas palavras da Montagem',
+    async ({ page }) => {
+      await login(page, email!, senha!)
+      await page.goto('/producao')
+      await expect(page.getByRole('heading', { name: 'Produção da cozinha' }))
+        .toBeVisible({ timeout: 20_000 })
+
+      // o parágrafo, não o `span`: getByText casa o nó mais interno, que traz
+      // só "Large alaranjado" e faz as outras asserções falharem
+      const legenda = page.locator('p').filter({ hasText: /Large.*alaranjado/ })
+      await expect(legenda).toBeVisible()
+      await expect(legenda).toContainText('Small')
+      await expect(legenda).toContainText('Menu Brasileiro')
+    })
+
   test('kitchen notes aparecem no topo da folha', async ({ page }) => {
     await login(page, email!, senha!)
     await page.goto('/producao')
