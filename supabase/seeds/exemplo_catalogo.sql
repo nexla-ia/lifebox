@@ -197,6 +197,23 @@ select d.id, t.id from dishes d, dish_tags t
 insert into dish_sizes (dish_id, size_id)
 select d.id, s.id from dishes d, sizes s where s.active;
 
--- a W37 rodou o Menu 2 do ciclo
-insert into menu_dishes (menu_id, dish_id)
-select (select id from menus where cycle_position = 2), d.id from dishes d;
+-- =========================================================== menus do ciclo
+-- A W37 rodou o Menu 2, com o cardápio inteiro. Os outros três do ciclo
+-- também precisam sair cheios: a rotação é automática (§4), e semana que
+-- caísse num menu vazio abriria o link público sem prato nenhum — a pessoa
+-- escolhe o plano, chega na escolha dos pratos e não há o que marcar.
+--
+-- Cada um leva uma seleção própria do mesmo catálogo, que é como a LifeBox
+-- trabalha: tirar um prato do menu não apaga o prato, ele volta noutro ciclo.
+
+insert into menu_dishes (menu_id, dish_id, position)
+select m.id, d.id, row_number() over (partition by m.id order by d.name_pt)
+  from menus m
+  join (select id, name_pt, row_number() over (order by name_pt) as n
+          from dishes) d
+    on m.cycle_position = 2                      -- o menu real da W37: tudo
+    or (d.n + m.cycle_position) % 4 <> 0;        -- os outros: 15 dos 20
+
+-- `position` manda na ordem da folha de montagem (§6.7) e na do link. Sem ela
+-- a ordem sai do banco, que muda sozinha — e a cozinha monta na sequência do
+-- menu, não na que o Postgres devolver hoje.
