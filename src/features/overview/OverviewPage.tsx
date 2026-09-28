@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { apenasDecimal } from '../../lib/numero'
 import { money } from '../../lib/supabase'
 import { useQuery } from '../../lib/useQuery'
@@ -34,6 +34,8 @@ export function OverviewPage() {
   const [chave, setChave] = useState<string | null>(null)
   const [aba, setAba] = useState<'dashboard' | 'tabela'>('dashboard')
   const [drill, setDrill] = useState<Recorte | null>(null)
+  const [modo, setModo] = useState<'anterior' | 'ano' | 'escolhido'>('anterior')
+  const [escolhido, setEscolhido] = useState<string | null>(null)
 
   const periodos = useQuery(() => fetchPeriodos(tipo), [tipo])
   const lista = periodos.data ?? []
@@ -53,12 +55,32 @@ export function OverviewPage() {
   const anterior = i > 0 ? lista[i - 1] : null
   const proximo = i >= 0 && i < lista.length - 1 ? lista[i + 1] : null
 
+  /* §10 pede TRÊS comparações: período anterior, mesmo período do ano passado,
+   * ou um escolhido. As duas últimas faltavam.
+   *
+   * A do ano passado se calcula trocando o ano na chave — e só vale se aquele
+   * período existir na lista: comparar com um período sem dado nenhum daria
+   * "▼ 100%" em tudo, que se lê como desabamento e é só ausência de histórico. */
+  const anoPassado = useMemo(() => {
+    if (!chave) return null
+    const alvo = tipo === 'year'
+      ? String(Number(chave) - 1)
+      : `${Number(chave.slice(0, 4)) - 1}${chave.slice(4)}`
+    return lista.includes(alvo) ? alvo : null
+  }, [chave, tipo, lista])
+
+  const alvoComparacao = modo === 'anterior' ? anterior
+    : modo === 'ano' ? anoPassado
+    : (escolhido && lista.includes(escolhido) ? escolhido : null)
+
   const ov = useQuery(
     () => (chave ? fetchOverview(tipo, chave) : Promise.resolve({ data: null, error: null })),
     [tipo, chave])
   const comp = useQuery(
-    () => (anterior ? fetchOverview(tipo, anterior) : Promise.resolve({ data: null, error: null })),
-    [tipo, anterior])
+    () => (alvoComparacao
+      ? fetchOverview(tipo, alvoComparacao)
+      : Promise.resolve({ data: null, error: null })),
+    [tipo, alvoComparacao])
   const serie = useQuery(
     () => (chave ? fetchSerie(tipo, chave, 5) : Promise.resolve({ data: null, error: null })),
     [tipo, chave])
@@ -103,11 +125,40 @@ export function OverviewPage() {
             className="px-2 text-[14px] text-ink-3 disabled:text-line-strong hover:text-brand">›</button>
         </div>
 
-        {anterior && (
-          <span className="text-[11.5px] text-ink-3">
-            comparando com {rotulo(tipo, anterior)}
-          </span>
-        )}
+        {/* §10: comparar com o período anterior, com o mesmo do ano passado ou
+            com um escolhido. Opção sem dado não entra na lista — comparar com
+            um período vazio daria "▼ 100%" em tudo, que se lê como desabamento
+            e é só ausência de histórico. */}
+        <label className="flex items-center gap-1.5 text-[11.5px] text-ink-3">
+          Comparar com
+          <select
+            value={modo}
+            onChange={(e) => setModo(e.target.value as typeof modo)}
+            className="bg-surface border border-line rounded-lg px-2 py-1 text-[11.5px] text-ink-2">
+            <option value="anterior" disabled={!anterior}>
+              {anterior ? `${rotulo(tipo, anterior)} · período anterior` : 'sem período anterior'}
+            </option>
+            <option value="ano" disabled={!anoPassado}>
+              {anoPassado ? `${rotulo(tipo, anoPassado)} · ano passado` : 'sem o ano passado'}
+            </option>
+            <option value="escolhido">escolher…</option>
+          </select>
+          {modo === 'escolhido' && (
+            <select
+              value={escolhido ?? ''}
+              onChange={(e) => setEscolhido(e.target.value || null)}
+              aria-label="Período de comparação"
+              className="bg-surface border border-line rounded-lg px-2 py-1 text-[11.5px] text-ink-2">
+              <option value="">—</option>
+              {lista.filter((k) => k !== chave).map((k) => (
+                <option key={k} value={k}>{rotulo(tipo, k)}</option>
+              ))}
+            </select>
+          )}
+          {alvoComparacao && (
+            <span className="text-ink-muted">vs {rotulo(tipo, alvoComparacao)}</span>
+          )}
+        </label>
 
         <div className="flex-1" />
 
@@ -163,24 +214,51 @@ function Dashboard({
   onRecarregar: () => void
 }) {
   const f = ov.faturamento
+  const pontos = serie.length >= 2 ? serie : undefined
   const emAndamento = ov.periodo.em_andamento
 
   return (
     <div className="flex flex-col gap-4">
+      {/* A série chega do mais antigo ao atual — é a ordem que a sparkline
+          desenha. Menos de dois pontos ela mesma recusa: uma linha reta
+          pareceria estabilidade medida. */}
       {emAndamento && (
         <div className="bg-late-bg border border-late-line text-late-text rounded-xl px-4 py-2.5 text-[12px]">
-          ⏳ <strong>Período em andamento.</strong> Os números ainda vão mudar até o
-          fim da semana — as barras em hachura são parciais.
+          ⏳ <strong>Período em andamento.</strong>
+          {ov.periodo.pct_decorrido != null && (
+            <> {ov.periodo.pct_decorrido.toFixed(0)}% dele já passou —
+              o resto do número de Faturamento é projeção.</>
+          )}
+          {' '}As barras em hachura são parciais.
+          {ov.pedidos.ativos_sem_pedido != null && ov.pedidos.ativos_sem_pedido > 0 && (
+            <> <strong>{ov.pedidos.ativos_sem_pedido}</strong>{' '}
+              cliente{ov.pedidos.ativos_sem_pedido === 1 ? '' : 's'} ativo
+              {ov.pedidos.ativos_sem_pedido === 1 ? '' : 's'} ainda sem pedido.</>
+          )}
         </div>
       )}
 
+      {/* §10: KPI com variação E sparkline. A variação diz o último passo; a
+          sparkline diz se ele vem depois de subida ou de queda — ▲4% depois de
+          três quedas é outra história que ▲4% depois de três altas. */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2.5">
         <Card titulo="Faturamento" tom="brand" valor={money(f.total_cents)}
           delta={comp ? variacao(f.total_cents, comp.faturamento.total_cents) : null}
+          serie={pontos?.map((p) => p.total_cents)}
           onAbrir={() => onDrill('total')}
-          nota={ov.meta_cents > 0
-            ? <>{f.pct_meta?.toFixed(1).replace('.', ',')}% da meta de {money(ov.meta_cents)}</>
-            : 'sem meta definida'} />
+          nota={<>
+            {ov.meta_cents > 0
+              ? <>{f.pct_meta?.toFixed(1).replace('.', ',')}% da meta de {money(ov.meta_cents)}</>
+              : 'sem meta definida'}
+            {/* projeção só no período aberto, e NUNCA somada ao faturado:
+                sai rotulada, com o quanto do período já passou ao lado */}
+            {f.projecao_cents != null && (
+              <> · projeção {money(f.projecao_cents)}
+                {f.projecao_pct_meta != null
+                  && <> ({f.projecao_pct_meta.toFixed(0)}% da meta)</>}
+              </>
+            )}
+          </>} />
 
         <Card titulo="Faturado" valor={money(f.faturado_cents)}
           onAbrir={() => onDrill('faturado')}
@@ -188,12 +266,14 @@ function Dashboard({
 
         <Card titulo="Total Pedidos" valor={String(ov.pedidos.total)}
           delta={comp ? variacao(ov.pedidos.total, comp.pedidos.total) : null}
+          serie={pontos?.map((p) => p.pedidos)}
           onAbrir={() => onDrill('total')}
           nota={ov.pedidos.total !== ov.pedidos.clientes
             ? <>de {ov.pedidos.clientes} clientes · {ov.pedidos.novo} Novo + {ov.pedidos.renovacao} Renovação</>
             : <>{ov.pedidos.novo} Novo + {ov.pedidos.renovacao} Renovação</>} />
 
         <Card titulo="Ticket médio"
+          serie={pontos?.map((p) => p.ticket_medio_cents)}
           valor={ov.ticket_medio_cents != null ? money(ov.ticket_medio_cents) : '—'}
           delta={comp && comp.ticket_medio_cents && ov.ticket_medio_cents
             ? variacao(ov.ticket_medio_cents, comp.ticket_medio_cents) : null}

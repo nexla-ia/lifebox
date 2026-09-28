@@ -209,6 +209,50 @@ begin
   perform assert_eq((ov38->'periodo'->>'em_andamento')::boolean, false,
                     'semana passada nao');
 
+  raise notice 'periodo FECHADO nao tem projecao — o numero dele e final';
+  perform assert_eq(ov38->'periodo'->>'pct_decorrido', null,
+                    'semana fechada nao tem quanto dela passou');
+  perform assert_eq(ov38->'faturamento'->>'projecao_cents', null,
+                    'e nao tem projecao');
+  perform assert_eq(ov38->'pedidos'->>'ativos_sem_pedido', null,
+                    'nem cobranca de quem nao pediu numa semana que ja passou');
+
+  raise notice 'periodo EM ANDAMENTO projeta pelos dias decorridos (tela 8d)';
+  declare
+    v_iso text; hoje jsonb; v_pct numeric; v_tot int;
+  begin
+    select iso_code into v_iso from weeks
+     where fn_hoje_operacional() between starts_on and ends_on;
+    hoje  := fn_overview('week', v_iso);
+    v_pct := (hoje->'periodo'->>'pct_decorrido')::numeric;
+    v_tot := (hoje->'faturamento'->>'total_cents')::int;
+
+    perform assert_eq(v_pct > 0 and v_pct <= 100, true,
+                      'a semana de hoje tem parte dela decorrida');
+    -- regra de tres sobre os dias, e e de proposito que seja simples: uma
+    -- conta que a equipe refaz de cabeca vale mais que uma que ela nao confere
+    perform assert_eq((hoje->'faturamento'->>'projecao_cents')::int,
+                      round(v_tot / (v_pct / 100))::int,
+                      'projecao = parcial dividido pela fracao decorrida');
+    perform assert_eq((hoje->'faturamento'->>'projecao_cents')::int >= v_tot, true,
+                      'e nunca e MENOR que o que ja entrou');
+    perform assert_eq(hoje->'pedidos'->>'ativos_sem_pedido' is not null, true,
+                      'a semana aberta diz quantos ativos faltam');
+  end;
+
+  raise notice 'a serie leva o que o sparkline precisa';
+  declare ponto jsonb;
+  begin
+    ponto := (fn_overview_serie('week', '2026-W38', 3))->-1;
+    perform assert_eq(ponto->>'chave', '2026-W38', 'o ultimo ponto e o periodo pedido');
+    perform assert_eq((ponto->>'pedidos')::int,
+                      (ov38->'pedidos'->>'novo')::int + (ov38->'pedidos'->>'renovacao')::int,
+                      'pedidos do ponto = Novo + Renovacao, igual ao card');
+    perform assert_eq((ponto->>'ticket_medio_cents')::int,
+                      (ov38->>'ticket_medio_cents')::int,
+                      'e o ticket do ponto e o mesmo do card');
+  end;
+
   raise notice 'leads ficam em zero ate a automacao alimentar (§9.1)';
   perform assert_eq((ov38->'leads'->>'novos')::int, 0, 'nenhum lead ainda');
   perform assert_eq(ov38->'leads'->>'conversao', null,

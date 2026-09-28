@@ -8,7 +8,7 @@ import { money } from '../../lib/supabase'
  * custaria mais bundle do que a tela inteira. */
 
 export function Card({
-  titulo, valor, delta, nota, onAbrir, tom = 'ink',
+  titulo, valor, delta, nota, onAbrir, tom = 'ink', serie,
 }: {
   titulo: string
   valor: string
@@ -16,6 +16,8 @@ export function Card({
   nota?: ReactNode
   onAbrir?: () => void
   tom?: 'ink' | 'brand'
+  /** histórico do KPI, do mais antigo ao atual (§10) */
+  serie?: (number | null)[]
 }) {
   const conteudo = (
     <>
@@ -29,6 +31,7 @@ export function Card({
           {valor}
         </span>
         {delta != null && <Delta pct={delta} />}
+        {serie && <Sparkline pontos={serie} />}
       </div>
       {nota && <div className="text-[10.5px] text-ink-muted leading-snug">{nota}</div>}
     </>
@@ -43,6 +46,39 @@ export function Card({
                  hover:border-brand transition-colors">
       {conteudo}
     </button>
+  )
+}
+
+/** Sparkline: a forma do KPI nos últimos períodos, do mais antigo ao atual.
+ *
+ *  Sem eixo e sem número de propósito — quem quer o valor abre a Tabela. O que
+ *  ela responde é "está subindo ou caindo", que a variação sozinha não diz:
+ *  ▲ 4% depois de três quedas é outra história que ▲ 4% depois de três altas.
+ *
+ *  Um ponto só, ou todos iguais, não vira gráfico: melhor não desenhar do que
+ *  desenhar uma linha reta que parece estabilidade medida. */
+export function Sparkline({ pontos }: { pontos: (number | null)[] }) {
+  const vals = pontos.map((p) => p ?? 0)
+  if (vals.length < 2) return null
+  const min = Math.min(...vals)
+  const max = Math.max(...vals)
+  if (max === min) return null
+
+  const l = vals.length
+  const d = vals.map((v, i) => {
+    const x = (i / (l - 1)) * 46
+    const y = 14 - ((v - min) / (max - min)) * 12
+    return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`
+  }).join(' ')
+
+  return (
+    <svg width="46" height="16" viewBox="0 0 46 16" className="shrink-0"
+      role="img" aria-label={`tendência dos últimos ${l} períodos`}>
+      <path d={d} fill="none" stroke="var(--color-brand-mid)" strokeWidth="1.5"
+        strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="46" cy={(14 - ((vals[l - 1] - min) / (max - min)) * 12).toFixed(1)}
+        r="1.8" fill="var(--color-brand)" />
+    </svg>
   )
 }
 

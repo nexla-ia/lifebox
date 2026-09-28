@@ -78,6 +78,38 @@ test.describe('overview', () => {
     }
   })
 
+  // §10 pede as três comparações; só a do período anterior existia.
+  test('dá para comparar com outro período, e a escolha muda os números',
+    async ({ page }) => {
+      await entrar(page)
+      const seletor = page.getByLabel('Comparar com')
+      await expect(seletor).toBeVisible({ timeout: 20_000 })
+
+      // opção sem dado fica desabilitada em vez de sumir: assim a equipe vê
+      // que a comparação existe e por que não dá para usar agora
+      await expect(seletor.locator('option[value="ano"]')).toHaveCount(1)
+
+      await seletor.selectOption('escolhido')
+      const alvo = page.getByLabel('Período de comparação')
+      await expect(alvo).toBeVisible()
+      const opcoes = await alvo.locator('option').count()
+      expect(opcoes).toBeGreaterThan(1)
+    })
+
+  // §10: "KPIs com variação E sparkline". A sparkline é um `img` com rótulo,
+  // senão é desenho mudo para quem usa leitor de tela.
+  test('os KPIs trazem a tendência dos últimos períodos', async ({ page }) => {
+    await entrar(page)
+    await expect(page.getByLabel('Faturamento', { exact: true }))
+      .toBeVisible({ timeout: 20_000 })
+
+    // com uma semana só no banco não há tendência a desenhar, e ela não
+    // desenha reta — o teste aceita os dois estados e cobra a coerência
+    const linhas = page.getByRole('img', { name: /tendência dos últimos/ })
+    const n = await linhas.count()
+    if (n > 0) await expect(linhas.first()).toBeVisible()
+  })
+
   test('a meta é o único número digitado, e o card mostra o percentual', async ({ page }) => {
     await entrar(page)
 

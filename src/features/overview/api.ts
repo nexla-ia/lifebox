@@ -15,6 +15,9 @@ export type Periodo = {
   fim: string | null
   semanas: string[]
   em_andamento: boolean
+  dias: number | null
+  /** quanto do período já passou — nulo em período fechado ou futuro */
+  pct_decorrido: number | null
 }
 
 export type Overview = {
@@ -25,6 +28,9 @@ export type Overview = {
     faturado_cents: number
     a_receber_cents: number
     pct_meta: number | null
+    /** fechamento estimado por regra de três sobre os dias decorridos */
+    projecao_cents: number | null
+    projecao_pct_meta: number | null
   }
   pedidos: {
     /** conta PEDIDOS. `clientes` conta PESSOAS — divergem quando alguém pede
@@ -32,6 +38,8 @@ export type Overview = {
     total: number; clientes: number; novo: number; renovacao: number
     skip: number; cancelamento: number; parceria: number
     aguardando_selecao: number
+    /** clientes ativos que ainda não pediram — só no período em andamento */
+    ativos_sem_pedido: number | null
   }
   ticket_medio_cents: number | null
   ticket_pagos: number
@@ -60,6 +68,8 @@ export type PontoSerie = {
   ano_anterior_cents: number
   novo: number
   renovacao: number
+  pedidos: number
+  ticket_medio_cents: number | null
   skip: number
   cancelamento: number
   em_andamento: boolean

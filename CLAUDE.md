@@ -277,6 +277,25 @@ O bloco de leads fica zerado até o n8n alimentar `leads` (§9.1). A tela diz
 isso: `conversao` vem **NULL**, não 0 — sem denominador não há percentual, e
 "0%" se leria como desempenho ruim em vez de dado que não existe.
 
+**Projeção nunca vira faturado.** No período em andamento o parcial sozinho se
+lê como queda — uma terça-feira sempre perde para a semana fechada anterior. A
+projeção é regra de três sobre os dias decorridos (`pct_decorrido` em
+`fn_periodo`), deliberadamente burra: uma conta que a equipe refaz de cabeça
+vale mais que uma que ela não sabe conferir. Sai rotulada, ao lado do quanto do
+período já passou, e só existe no período aberto.
+
+A **sparkline** sai da mesma série dos gráficos, que por isso carrega `pedidos`
+e `ticket_medio_cents` além do dinheiro. Com menos de dois pontos, ou com todos
+iguais, ela não desenha: uma linha reta se leria como estabilidade medida.
+
+**Comparação com período sem dado não entra na lista.** Comparar com um período
+vazio dá "▼ 100%" em tudo, que se lê como desabamento e é só ausência de
+histórico. A opção aparece desabilitada, para a equipe ver que existe.
+
+Ainda faltam do §10, e dependem de `leads` existir: bloco de Ads (o
+`fn_overview` já devolve `ads_revenue_cents`, `ads_leads` e `ads_convertidos`),
+tendência de conversão e follow-up pendente.
+
 ## Configurações (§9.8)
 
 É aqui que o princípio do projeto se paga: ZIP, origem, cutoff, forma de
