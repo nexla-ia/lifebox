@@ -73,7 +73,12 @@ test.describe('painel da semana', () => {
     // "Tudo em dia" só aparece quando NÃO há pendência, e a semana é da
     // cliente: ela pode ter lançado pedido aguardando pagamento. O teste
     // confere o estado que existe em vez de exigir a semana vazia.
-    const lista = page.getByRole('listitem')
+    //
+    // Escopado NA SEÇÃO. Solto na página, o locator pegava também os cartões
+    // do quadro por pagamento, que são `li`: com a semana sem pendência mas
+    // com um pedido já confirmado, "Tudo em dia" aparecia e a contagem vinha 1.
+    const bloco = page.locator('section').filter({ hasText: 'Precisa de ação agora' })
+    const lista = bloco.getByRole('listitem')
     if (await page.getByText('Tudo em dia').isVisible()) {
       await expect(lista).toHaveCount(0)
     } else {
@@ -122,8 +127,12 @@ test.describe('painel da semana', () => {
     // teste; o resto da semana é da cliente e continua onde estava.
     const money = (c: number) =>
       (c / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
-    await expect(page.getByLabel('Faturado')).toHaveText(money(14760), { timeout: 20_000 })
-    await expect(page.getByLabel('A receber')).toHaveText(money(antes.total_cents))
+    // DIFERENÇA, não total: a semana é da cliente e pode já ter pagamento
+    // confirmado. Exigir "faturado = 147.60" só passava com a semana sem nada
+    // pago, e quebrava no dia em que alguém confirmasse um pedido pela tela.
+    await expect(page.getByLabel('Faturado'))
+      .toHaveText(money(antes.faturado_cents + 14760), { timeout: 20_000 })
+    await expect(page.getByLabel('A receber')).toHaveText(money(antes.a_receber_cents))
     // e o cartão não oferece mais avanço: confirmado é o fim da fila
     await expect(cartaoNoQuadro(page).getByRole('button', { name: /→/ })).toHaveCount(0)
   })

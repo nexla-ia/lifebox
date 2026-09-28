@@ -377,9 +377,12 @@ export async function setWebhookPedido(url: string) {
  *  Serve para o teste medir a DIFERENÇA que o próprio pedido causou. O banco
  *  é o da cliente e ela já lança pedido de verdade: assumir total absoluto faz
  *  o teste quebrar no dia em que alguém usa o sistema, sem haver bug. */
-export async function lerOverviewSemana(): Promise<{ total_cents: number; pedidos: number }> {
+export async function lerOverviewSemana(): Promise<
+  { total_cents: number; faturado_cents: number; a_receber_cents: number; pedidos: number }
+> {
+  const vazio = { total_cents: 0, faturado_cents: 0, a_receber_cents: 0, pedidos: 0 }
   const c = await conectar()
-  if (!c) return { total_cents: 0, pedidos: 0 }
+  if (!c) return vazio
   const semana = await fetch(`${c.url}/rest/v1/rpc/fn_link_semana`, {
     method: 'POST',
     headers: { apikey: c.key, Authorization: `Bearer ${c.token}`, 'Content-Type': 'application/json' },
@@ -391,11 +394,20 @@ export async function lerOverviewSemana(): Promise<{ total_cents: number; pedido
     headers: { apikey: c.key, Authorization: `Bearer ${c.token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ p_tipo: 'week', p_chave: iso_code }),
   })
-  if (!r.ok) return { total_cents: 0, pedidos: 0 }
+  if (!r.ok) return vazio
   const ov = (await r.json()) as {
-    faturamento: { total_cents: number }; pedidos: { total: number }
+    faturamento: { total_cents: number; faturado_cents: number; a_receber_cents: number }
+    pedidos: { total: number }
   }
-  return { total_cents: ov.faturamento.total_cents, pedidos: ov.pedidos.total }
+  // "A receber" NÃO é o total: pedido confirmado sai dele. Medir contra o
+  // total só funcionava enquanto nada na semana estivesse pago, e passou a
+  // falhar assim que alguém confirmou um pagamento pela tela.
+  return {
+    total_cents: ov.faturamento.total_cents,
+    faturado_cents: ov.faturamento.faturado_cents,
+    a_receber_cents: ov.faturamento.a_receber_cents,
+    pedidos: ov.pedidos.total,
+  }
 }
 
 /** Quantos itens a cozinha já tem para produzir na semana corrente. */

@@ -128,6 +128,120 @@ export const salvarMeta = (isoCode: string, amount_cents: number) =>
     { onConflict: 'period_type,period_key' },
   )
 
+/* ------------------------------------------------- ficha de um pedido (9b) */
+
+export type ItemFicha = {
+  item_type: string
+  qty: number
+  unit_price_cents: number
+  name_snapshot: string
+  category_snapshot: string | null
+  taxable: boolean
+  charges_delivery: boolean
+  position: number | null
+}
+
+export type ComprovanteFicha = {
+  id: string
+  storage_path: string
+  transaction_id: string | null
+  check_result: string
+  check_detail: string | null
+  status: string
+  received_at: string
+  extracted: Record<string, unknown> | null
+}
+
+export type DetalhePedido = {
+  id: string
+  code: string
+  kind: string
+  fulfillment: string
+  post_cutoff: boolean
+  is_partnership: boolean
+  taxable_cents: number
+  tax_cents: number
+  delivery_cents: number
+  non_taxable_cents: number
+  total_cents: number
+  paid_amount_cents: number
+  payment_status: string
+  confirmed_by_kind: string | null
+  confirmed_at: string | null
+  created_at: string
+  phone_e164: string | null
+  cliente: string
+  telefone: string
+  order_status: string | null
+  semana: string
+  plano: string | null
+  tamanho: string | null
+  forma: string | null
+  itens: ItemFicha[]
+  comprovantes: ComprovanteFicha[]
+}
+
+/** Tudo de um pedido, para a ficha (§9.2, protótipo 9b).
+ *
+ *  Os itens vêm de `order_items`, que guarda SNAPSHOT de nome e preço: a ficha
+ *  mostra o pedido como ele foi fechado, não como o catálogo está hoje. É o que
+ *  faz um pedido de três semanas atrás continuar explicável depois de a LifeBox
+ *  mexer no cardápio. */
+export async function fetchDetalhePedido(
+  orderId: string,
+): Promise<{ data: DetalhePedido | null; error: { message: string } | null }> {
+  const { data, error } = await supabase
+    .from('orders')
+    .select(`
+      id, code, kind, fulfillment, post_cutoff, is_partnership,
+      taxable_cents, tax_cents, delivery_cents, non_taxable_cents, total_cents,
+      paid_amount_cents, payment_status, confirmed_by_kind, confirmed_at,
+      created_at, phone_e164,
+      customers ( first_name, last_name, phone_e164 ),
+      weeks ( iso_code ),
+      plans ( name_pt ),
+      sizes!orders_size_id_fkey ( name ),
+      payment_methods ( name_pt ),
+      order_items ( item_type, qty, unit_price_cents, name_snapshot,
+                    category_snapshot, taxable, charges_delivery, position ),
+      payment_receipts ( id, storage_path, transaction_id, check_result,
+                         check_detail, status, received_at, extracted )
+    `)
+    .eq('id', orderId)
+    .single()
+  if (error) return { data: null, error }
+
+  const o = data as unknown as Record<string, any>
+  const c = o.customers ?? {}
+
+  // o status da SEMANA é da pessoa, não do pedido — por isso vem à parte
+  const { data: cw } = await supabase
+    .from('customer_weeks')
+    .select('order_status, customer_id, week_id')
+    .eq('order_id', orderId)
+    .maybeSingle()
+
+  const ficha = {
+    ...(o as object),
+    cliente: [c.first_name, c.last_name].filter(Boolean).join(' '),
+    // o telefone do PEDIDO é o que a confirmação usou; o do cadastro pode ter
+    // mudado desde então
+    telefone: o.phone_e164 ?? c.phone_e164 ?? '',
+    order_status: cw?.order_status ?? null,
+    semana: o.weeks?.iso_code ?? '',
+    plano: o.plans?.name_pt ?? null,
+    tamanho: o.sizes?.name ?? null,
+    forma: o.payment_methods?.name_pt ?? null,
+    itens: (o.order_items ?? []).slice().sort(
+      (a: ItemFicha, b: ItemFicha) => (a.position ?? 0) - (b.position ?? 0)),
+    comprovantes: (o.payment_receipts ?? []).slice().sort(
+      (a: ComprovanteFicha, b: ComprovanteFicha) =>
+        b.received_at.localeCompare(a.received_at)),
+  } as DetalhePedido
+
+  return { data: ficha, error: null }
+}
+
 export const mudarPagamento = (orderId: string, payment_status: string) =>
   supabase.from('orders').update({
     payment_status,

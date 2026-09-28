@@ -14,7 +14,7 @@ const marca = Date.now().toString().slice(-6)
 
 let fx: Awaited<ReturnType<typeof criarFixturePedido>> = null
 // a semana é da cliente e já tem pedido dela: mede-se a diferença
-let antes = { total_cents: 0, pedidos: 0 }
+let antes = { total_cents: 0, a_receber_cents: 0, pedidos: 0 }
 
 test.describe('pedidos', () => {
   test.describe.configure({ mode: 'serial' })
@@ -101,11 +101,47 @@ test.describe('pedidos', () => {
       await expect(page.getByText(/Total Pedidos/)).toBeVisible()
     })
 
+  // Protótipo 9b: o cartão do quadro abre a ficha. O que se prova aqui é que a
+  // ficha mostra o pedido COMO FOI FECHADO — nome e preço vêm do snapshot de
+  // order_items — e que o pedido aberto fica na URL, para recarregar no meio
+  // da conferência não jogar de volta no quadro.
+  test('clicar no cartão abre a ficha do pedido, e ela sobrevive ao F5', async ({ page }) => {
+    await abrirFicha(page)
+    await montarPlano(page, 11)
+    await page.getByRole('button', { name: /Salvar pedido/ }).click()
+    await expect(page.getByText(/Pedido \w+-\d{4} criado/)).toBeVisible({ timeout: 20_000 })
+
+    await page.getByRole('button', { name: new RegExp(`Abrir pedido de Cliente ${marca}`) })
+      .click()
+
+    await expect(page.getByRole('heading', { name: new RegExp(`Cliente ${marca}`) }))
+      .toBeVisible({ timeout: 20_000 })
+    // o prato pelo nome congelado, e a conta com o extra da faixa (§5.6)
+    await expect(page.getByText(`Prato ${marca}`)).toBeVisible()
+    await expect(page.getByText('$159.10')).toBeVisible()
+    await expect(page.getByText('Tax')).toBeVisible()
+
+    // recarregar continua no mesmo pedido
+    await expect(page).toHaveURL(/[?&]pedido=/)
+    await page.reload()
+    await expect(page.getByRole('heading', { name: new RegExp(`Cliente ${marca}`) }))
+      .toBeVisible({ timeout: 20_000 })
+
+    // e a volta desfaz o parâmetro, senão o botão "voltar" do navegador
+    // devolveria para a ficha de novo
+    await page.getByRole('button', { name: '‹ Semana' }).click()
+    await expect(page).not.toHaveURL(/[?&]pedido=/)
+  })
+
   // Reunião de 22/09/2026: o mesmo cliente pode ter mais de um pedido na
   // semana — pedir para si e depois para alguém da casa é o caso real. O que
   // importa provar é que o segundo NÃO some do dinheiro: a versão anterior do
   // resumo somava atravessando customer_weeks.order_id, que aponta para um só.
   test('segundo pedido do mesmo cliente entra, e o dinheiro dos dois aparece', async ({ page }) => {
+    // Linha de base lida AGORA, não no beforeAll. Este spec roda serial e
+    // compartilha o banco: qualquer teste acima que lance um pedido move o
+    // número, e a falha aparece aqui, num teste que não tem nada a ver.
+    const base = await lerOverviewSemana()
     await abrirFicha(page)
     await montarPlano(page, 10)
     await expect(totalNoResumo(page)).toHaveText('$147.60', { timeout: 20_000 })
@@ -113,10 +149,11 @@ test.describe('pedidos', () => {
     await expect(page.getByText(/Pedido \w+-\d{4} criado/)).toBeVisible({ timeout: 20_000 })
 
     // o card conta PEDIDOS; o rodapé diz de quantos CLIENTES, para o número
-    // não parecer erro de conta. Os dois pedidos deste spec são do MESMO
-    // cliente: +2 pedidos, +1 cliente.
+    // não parecer erro de conta. Este pedido é do MESMO cliente de um pedido
+    // que já existe: +1 pedido e NENHUM cliente novo — é essa divergência que
+    // o rodapé explica.
     const total = page.locator('div').filter({ hasText: /^Total Pedidos/ }).first()
-    await expect(total).toContainText(String(antes.pedidos + 2), { timeout: 20_000 })
+    await expect(total).toContainText(String(base.pedidos + 1), { timeout: 20_000 })
     await expect(total).toContainText('clientes — alguém pediu mais de uma vez')
 
     // nenhum dos dois foi pago, então os dois estão em "A receber": é aí que
@@ -124,6 +161,6 @@ test.describe('pedidos', () => {
     const money = (c: number) =>
       (c / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
     await expect(page.getByLabel('A receber'))
-      .toHaveText(money(antes.total_cents + 15910 + 14760))
+      .toHaveText(money(base.a_receber_cents + 14760))
   })
 })

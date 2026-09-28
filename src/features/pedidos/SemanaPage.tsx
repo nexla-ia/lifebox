@@ -1,8 +1,10 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../lib/auth'
 import { useQuery } from '../../lib/useQuery'
 import { ErrorState, Loading } from '../../ui/states'
 import { fetchDadosPedido } from './api'
+import { DetalhePedido } from './DetalhePedido'
 import { FichaPedido } from './FichaPedido'
 import { PainelSemana } from './PainelSemana'
 
@@ -13,6 +15,11 @@ import { PainelSemana } from './PainelSemana'
 
 export function SemanaPage() {
   const { profile } = useAuth()
+  // O pedido aberto mora na URL, não no estado: recarregar no meio da
+  // conferência voltava para o quadro, e não havia como mandar "olha esse
+  // pedido" para alguém.
+  const [params, setParams] = useSearchParams()
+  const pedidoAberto = params.get('pedido')
   const [lancando, setLancando] = useState(false)
   const [aviso, setAviso] = useState<string | null>(null)
   const [recarga, setRecarga] = useState(0)
@@ -31,6 +38,20 @@ export function SemanaPage() {
           onCriado={(code) => {
             setLancando(false)
             setAviso(`Pedido ${code} criado.`)
+            setRecarga((n) => n + 1)
+          }}
+        />
+      </div>
+    )
+  }
+
+  if (pedidoAberto) {
+    return (
+      <div className="p-5">
+        <DetalhePedido
+          orderId={pedidoAberto}
+          onVoltar={() => {
+            setParams((q) => { q.delete('pedido'); return q })
             setRecarga((n) => n + 1)
           }}
         />
@@ -72,6 +93,7 @@ export function SemanaPage() {
         isoCode={data.semana.iso_code}
         podeEditarMeta={profile?.role === 'admin'}
         onNovoPedido={() => { setAviso(null); setLancando(true) }}
+        onAbrirPedido={(id) => setParams((q) => { q.set('pedido', id); return q })}
       />
     </div>
   )

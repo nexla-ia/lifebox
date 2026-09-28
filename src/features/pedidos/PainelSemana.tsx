@@ -32,9 +32,12 @@ type Props = {
   isoCode: string
   podeEditarMeta: boolean
   onNovoPedido: () => void
+  onAbrirPedido: (orderId: string) => void
 }
 
-export function PainelSemana({ weekId, isoCode, podeEditarMeta, onNovoPedido }: Props) {
+export function PainelSemana({
+  weekId, isoCode, podeEditarMeta, onNovoPedido, onAbrirPedido,
+}: Props) {
   const { data, loading, error, reload } = useQuery(
     () => fetchPainel(weekId, isoCode), [weekId, isoCode])
   const [modo, setModo] = useState<'painel' | 'planilha'>('painel')
@@ -99,7 +102,7 @@ export function PainelSemana({ weekId, isoCode, podeEditarMeta, onNovoPedido }: 
       {modo === 'painel' ? (
         <>
           <PrecisaDeAcao linhas={data.linhas} />
-          <Quadro linhas={linhasFiltradas} onMudou={reload} />
+          <Quadro linhas={linhasFiltradas} onMudou={reload} onAbrir={onAbrirPedido} />
         </>
       ) : (
         <Planilha linhas={linhasFiltradas} />
@@ -324,7 +327,9 @@ function PrecisaDeAcao({ linhas }: { linhas: LinhaPedido[] }) {
   )
 }
 
-function Quadro({ linhas, onMudou }: { linhas: LinhaPedido[]; onMudou: () => void }) {
+function Quadro({ linhas, onMudou, onAbrir }: {
+  linhas: LinhaPedido[]; onMudou: () => void; onAbrir: (orderId: string) => void
+}) {
   const coluna = (id: string) =>
     id === 'sem_pedido'
       ? linhas.filter((l) => !l.order && !FORA_DO_TOTAL.includes(l.order_status))
@@ -359,7 +364,10 @@ function Quadro({ linhas, onMudou }: { linhas: LinhaPedido[]; onMudou: () => voi
               ) : (
                 <ul className="flex flex-col gap-2">
                   {lista.map((l) => (
-                    <CartaoPedido key={l.customer_id} linha={l} coluna={c.id} onMudou={onMudou} />
+                    // a chave é o PEDIDO, não a pessoa: o mesmo cliente pode
+                    // ter dois pedidos na semana e cairiam com a mesma chave
+                    <CartaoPedido key={l.order?.id ?? l.customer_id} linha={l}
+                                  coluna={c.id} onMudou={onMudou} onAbrir={onAbrir} />
                   ))}
                 </ul>
               )}
@@ -389,13 +397,27 @@ const PROXIMO: Record<string, string> = {
 }
 
 function CartaoPedido({
-  linha, coluna, onMudou,
-}: { linha: LinhaPedido; coluna: string; onMudou: () => void }) {
+  linha, coluna, onMudou, onAbrir,
+}: {
+  linha: LinhaPedido; coluna: string; onMudou: () => void
+  onAbrir: (orderId: string) => void
+}) {
   const [ocupado, setOcupado] = useState(false)
   const proximo = linha.order ? PROXIMO[coluna] : undefined
 
+  // O cartão inteiro abre a ficha (protótipo 9b). É BOTÃO, não div com
+  // onClick: sem papel de botão o teclado não alcança e o leitor de tela não
+  // anuncia. O botão de avançar status fica FORA dele — botão dentro de botão
+  // é HTML inválido, e o clique vira loteria de qual dos dois disparou.
   return (
     <li className="bg-surface border border-line rounded-lg px-2.5 py-2">
+      <button
+        type="button"
+        disabled={!linha.order}
+        onClick={() => linha.order && onAbrir(linha.order.id)}
+        aria-label={linha.order ? `Abrir pedido de ${linha.cliente}` : undefined}
+        className="w-full text-left disabled:cursor-default"
+      >
       <div className="flex justify-between items-baseline gap-2">
         <span className="text-[12.5px] font-bold text-ink truncate">{linha.cliente}</span>
         {linha.order && (
@@ -418,6 +440,7 @@ function CartaoPedido({
         {[linha.order?.plano, linha.order?.size, linha.rota, linha.order?.forma]
           .filter(Boolean).join(' · ') || formatarTelefone(linha.telefone)}
       </div>
+      </button>
       {proximo && (
         <button
           disabled={ocupado}

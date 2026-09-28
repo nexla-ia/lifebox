@@ -59,12 +59,23 @@ test.describe('overview', () => {
       .toHaveText(money(antes.total_cents + 14760), { timeout: 20_000 })
     await expect(page.getByLabel('Total Pedidos', { exact: true }))
       .toHaveText(String(antes.pedidos + 1))
-    // ninguém pagou o do teste: ele fica todo em "a receber"
-    await expect(page.getByText(`a receber ${money(antes.total_cents + 14760)}`))
+    // ninguém pagou o do teste: ele entra inteiro em "a receber", SOMADO ao
+    // que a semana já tinha a receber — não ao total, que inclui o que já foi
+    // pago e por isso saiu de lá
+    await expect(page.getByText(`a receber ${money(antes.a_receber_cents + 14760)}`))
       .toBeVisible()
-    // sem pedido pago não há ticket médio — e não é zero, é ausência de conta
-    await expect(page.getByLabel('Ticket médio', { exact: true })).toHaveText('—')
-    await expect(page.getByText('nenhum pedido pago ainda')).toBeVisible()
+
+    // Ticket médio é faturado ÷ pedidos PAGOS. Sem nenhum pago ele é "—", e
+    // não zero: é ausência de conta, não desempenho ruim. Com a semana da
+    // cliente podendo ter pagamento confirmado, o teste confere o estado que
+    // existe — a regra em si está presa em overview_test.sql, onde a massa
+    // é nossa.
+    if (antes.faturado_cents === 0) {
+      await expect(page.getByLabel('Ticket médio', { exact: true })).toHaveText('—')
+      await expect(page.getByText('nenhum pedido pago ainda')).toBeVisible()
+    } else {
+      await expect(page.getByLabel('Ticket médio', { exact: true })).toHaveText(/\$/)
+    }
   })
 
   test('a meta é o único número digitado, e o card mostra o percentual', async ({ page }) => {
