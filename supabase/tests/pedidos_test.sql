@@ -173,6 +173,30 @@ begin
      ->>'total_cents')::int,
     14760, 'preco de previa');
 
+  raise notice 'apagar pedido NAO devolve o numero (§6.2)';
+  -- Era o bug: com `count(*) + 1`, apagar um pedido fazia o proximo nascer com
+  -- um codigo que ja existia e bater na unique. A tela mostrava
+  -- "duplicate key value violates unique constraint" e o pedido nao entrava.
+  declare v_antes text; v_depois text; v_tmp uuid; r3 jsonb; begin
+    r3 := fn_create_order(jsonb_build_object(
+      'customer_id', v_c, 'week_id', v_w, 'kind','plan','plan_id',v_plan,'size_id',v_s,
+      'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_meal,'qty',10))));
+    v_antes := r3->>'code';
+    v_tmp   := (r3->>'order_id')::uuid;
+
+    delete from order_items where order_id = v_tmp;
+    delete from orders       where id      = v_tmp;
+
+    r3 := fn_create_order(jsonb_build_object(
+      'customer_id', v_c, 'week_id', v_w, 'kind','plan','plan_id',v_plan,'size_id',v_s,
+      'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_meal,'qty',10))));
+    v_depois := r3->>'code';
+
+    perform assert_eq(right(v_depois, 4)::int, right(v_antes, 4)::int + 1,
+                      'o numero seguiu em frente mesmo com o anterior apagado');
+    perform assert_eq(v_depois = v_antes, false, 'e nao reaproveitou o codigo');
+  end;
+
   raise notice 'status da semana sem pedido';
   insert into customers (first_name, phone_e164)
     values ('Pausada', '+15550006666') returning id into v_outro;

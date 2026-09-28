@@ -400,7 +400,19 @@ export async function lerOverviewSemana(): Promise<{ total_cents: number; pedido
 
 /** Quantos itens a cozinha já tem para produzir na semana corrente. */
 export async function lerItensProducao(): Promise<number> {
-  const r = await rest('v_production?select=qty')
+  // A SEMANA CORRENTE, não a view inteira. A tela de Produção mostra a folha
+  // da semana de hoje; somar todas as semanas dava a linha de base certa
+  // enquanto só existia uma, e passou a trazer a anterior junto na virada —
+  // o teste acusava 20 itens a mais sem haver pedido nenhum novo.
+  const c = await conectar()
+  if (!c) return 0
+  const w = await fetch(`${c.url}/rest/v1/rpc/fn_semana_atual`, {
+    method: 'POST',
+    headers: { apikey: c.key, Authorization: `Bearer ${c.token}`, 'Content-Type': 'application/json' },
+    body: '{}',
+  })
+  const weekId = (await w.json()) as string
+  const r = await rest(`v_production?select=qty&week_id=eq.${weekId}`)
   if (!r) return 0
   const linhas = (await r.json()) as { qty: number }[]
   return linhas.reduce((s, l) => s + Number(l.qty ?? 0), 0)
