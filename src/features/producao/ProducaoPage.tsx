@@ -38,6 +38,11 @@ const corDoTamanho = (t: string) =>
   t === 'L' ? 'text-late-text' : 'text-ink'
 const ehBrasileiro = (categoria: string) => categoria === 'brasileiro'
 
+/* Texto verde sozinho não se vê de longe, e a folha é lida de pé, a um braço
+ * de distância, sob a luz da cozinha. A LINHA inteira recebe o fundo: é o que
+ * dá para enxergar de relance, que é como a folha é usada. */
+const LINHA_BR = 'bg-leaf-bg'
+
 export function ProducaoPage() {
   const { profile } = useAuth()
   const ehCozinha = profile?.role === 'cozinha'
@@ -218,7 +223,7 @@ function Bloco({
           </thead>
           <tbody>
             {grupo.itens.map((i) => (
-              <tr key={i.prato}>
+              <tr key={i.prato} className={ehBrasileiro(grupo.categoria) ? LINHA_BR : ''}>
                 <td className={`px-3 py-2 border-b border-black/25 text-[14.5px] font-semibold leading-tight ${
                   ehBrasileiro(grupo.categoria) ? 'text-leaf' : 'text-black'}`}>
                   {i.prato}
@@ -252,7 +257,8 @@ function Bloco({
 
   return (
     <div className="bg-surface border border-line rounded-xl overflow-hidden break-inside-avoid">
-      <div className="flex justify-between items-center px-3.5 py-2.5 border-b border-line bg-surface-alt">
+      <div className={`flex justify-between items-center px-3.5 py-2.5 border-b border-line ${
+        ehBrasileiro(grupo.categoria) ? 'bg-leaf-bg border-leaf-line' : 'bg-surface-alt'}`}>
         <span className={`text-[13.5px] font-bold ${
           ehBrasileiro(grupo.categoria) ? 'text-leaf' : 'text-brand'}`}>{titulo}</span>
         <span className="bg-muted-bg text-ink-3 rounded-full px-2 py-0.5 text-[11px] font-semibold tnum">
@@ -271,7 +277,8 @@ function Bloco({
         </thead>
         <tbody>
           {grupo.itens.map((i) => (
-            <tr key={i.prato} className="hover:bg-cream/60">
+            <tr key={i.prato} className={`hover:bg-cream/60 ${
+              ehBrasileiro(grupo.categoria) ? LINHA_BR : ''}`}>
               <td className={`px-3 py-1.5 border-b border-line-soft ${
                 ehBrasileiro(grupo.categoria) ? 'text-leaf font-semibold' : 'text-ink'}`}>
                 {i.prato}
@@ -387,10 +394,14 @@ function Matriz({ weekId }: { weekId: string }) {
           </tr>
         </thead>
         <tbody>
-          {pratos.map((p) => (
-            <tr key={p} className="hover:bg-cream/60">
-              <td className={`sticky left-0 z-10 bg-surface px-3.5 py-1.5 border-b border-line-soft border-r border-line-soft whitespace-nowrap ${
-                categoriaDoPrato.get(p) === 'brasileiro' ? 'text-leaf font-semibold' : 'text-ink'}`}>
+          {pratos.map((p) => {
+            const br = categoriaDoPrato.get(p) === 'brasileiro'
+            return (
+            <tr key={p} className={`hover:bg-cream/60 ${br ? LINHA_BR : ''}`}>
+              {/* a primeira coluna é grudada e tem fundo próprio; sem repetir
+                  o verde nela, a linha aparece cortada ao rolar de lado */}
+              <td className={`sticky left-0 z-10 px-3.5 py-1.5 border-b border-line-soft border-r border-line-soft whitespace-nowrap ${
+                br ? 'bg-leaf-bg text-leaf font-semibold' : 'bg-surface text-ink'}`}>
                 {p}
               </td>
               {clientes.map((c) => {
@@ -408,7 +419,8 @@ function Matriz({ weekId }: { weekId: string }) {
                 {totalPrato(p)}
               </td>
             </tr>
-          ))}
+            )
+          })}
           <tr className="bg-surface-alt">
             <td className="sticky left-0 z-10 bg-surface-alt px-3.5 py-2 font-bold text-brand border-r border-line-soft whitespace-nowrap">
               Total do cliente

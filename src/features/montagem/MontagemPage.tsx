@@ -295,7 +295,12 @@ function Tabela({
  *  atrapalha é separar as duas linhas, não o tamanho — e é essa a troca que
  *  acontece na bancada. */
 function corDoPrato(prato: PratoMontagem, misto: boolean) {
-  if (misto && prato.categoria === 'brasileiro') return 'text-leaf font-semibold'
+  // Fundo, não só texto: verde sobre creme quase não se vê a um braço de
+  // distância, que é como a folha é lida. Aqui a linha mistura as duas
+  // categorias, então quem recebe o fundo é o PRATO, não a linha inteira.
+  if (misto && prato.categoria === 'brasileiro') {
+    return 'text-leaf font-bold bg-leaf-bg rounded px-1'
+  }
   if (prato.size === 'L') return 'text-late-text font-semibold'
   return 'text-ink'
 }
