@@ -388,6 +388,24 @@ de empilhar outro.
 Fora do controle de bag, com 0: quem não usa bag térmica e quem retira na
 cozinha (pick-up).
 
+**Duas folhas, e as duas são para imprimir** (reunião de 22/09/2026): *Cozinha*
+traz o pedido inteiro mais Montado, Bags, Gelo, Coletar e as notas de montagem;
+*Driver* traz só nome, telefone, endereço, bags e notas de entrega — o que vai
+dentro da sacola não é da conta de quem dirige, e sem isso a folha do carro não
+cabe numa página. A visão e a rota moram na URL, então imprimir a folha de uma
+rota é mandar um link.
+
+Na folha da cozinha o prato é colorido: **Large alaranjado, Small preto**, e
+num pedido que mistura clássico com brasileiro o **brasileiro sai verde** — os
+dois vão na mesma sacola e é aí que se troca. O verde ganha do tamanho.
+
+`orders.delivery_seq` é a ordem do trajeto, definida arrastando a linha (ou
+pelas setas, que é o mesmo recurso para o teclado e para o toque). É por
+SEMANA, não do cliente: o trajeto muda conforme quem pediu. Nulo vai para o
+fim, senão parada nova cairia no meio de um trajeto já organizado. Quem grava é
+`fn_ordenar_entrega`, a rota inteira numa chamada — um UPDATE por parada
+deixaria duas na mesma posição se parasse no meio.
+
 Desmarcar é desfazer clique errado, não apagar história: com devolução já
 registrada a função **recusa**, senão o saldo ficaria negativo — alguém teria
 devolvido o que o sistema diz que nunca saiu. A mensagem é escrita para quem

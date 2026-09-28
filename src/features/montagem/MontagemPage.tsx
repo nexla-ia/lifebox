@@ -1,18 +1,24 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { apenasDigitos } from '../../lib/numero'
 import { formatarTelefone } from '../../lib/telefone'
 import { useQuery } from '../../lib/useQuery'
 import { EmptyState, ErrorState, Loading } from '../../ui/states'
 import { fetchSemanaCorrente } from '../producao/api'
 import {
-  fetchBags, fetchMontagem, marcarGelo, marcarMontado,
-  type ParadaMontagem, type SaldoBag,
+  fetchBags, fetchMontagem, marcarGelo, marcarMontado, ordenarEntrega,
+  type ParadaMontagem, type PratoMontagem, type SaldoBag,
 } from './api'
 
 /* Tela 9.9 · Montagem de domingo. Ref: protótipo 11a e 11f.
  *
- * Uma aba por rota, mais Pick-up. O pedido inteiro na linha, e as colunas de
- * conferência: Montado, Bags, Gelo, Coletar.
+ * DUAS FOLHAS, e é para imprimir (reunião de 22/09/2026):
+ *
+ *   · Cozinha — o pedido inteiro, montado, bags, gelo, coletar e as notas de
+ *     montagem. É quem monta a sacola.
+ *   · Driver  — nome, telefone, endereço, bags e as notas de entrega. SEM o
+ *     pedido: o que vai dentro da sacola não é da conta de quem dirige, e a
+ *     folha do carro fica curta o bastante para caber numa página.
  *
  * §6.7: marcar Montado REGISTRA o envio das bags — as duas coisas na mesma
  * função do banco, senão o saldo mente. Quem não usa bag térmica e quem
@@ -36,10 +42,16 @@ export function MontagemPage() {
   return <Folha weekId={weekId} entrega={semana.data.ends_on} iso={semana.data.iso_code} />
 }
 
+type Visao = 'cozinha' | 'driver'
+
 function Folha({ weekId, entrega, iso }: { weekId: string; entrega: string; iso: string }) {
   const { data, loading, error, reload } = useQuery(() => fetchMontagem(weekId), [weekId])
   const bags = useQuery(fetchBags, [])
-  const [aba, setAba] = useState<string>('')
+  // Rota e visão moram na URL: imprimir a folha do driver de uma rota é mandar
+  // um link, e recarregar no meio da conferência não volta para a primeira aba.
+  const [params, setParams] = useSearchParams()
+  const aba = params.get('rota') ?? ''
+  const visao: Visao = params.get('visao') === 'driver' ? 'driver' : 'cozinha'
   const [erro, setErro] = useState<string | null>(null)
 
   const abas = useMemo(() => {
@@ -51,9 +63,11 @@ function Folha({ weekId, entrega, iso }: { weekId: string; entrega: string; iso:
   }, [data])
 
   const abaAtual = aba || abas[0] || ''
-  const paradas = (data ?? []).filter((p) =>
-    abaAtual === 'Pick-up' ? p.fulfillment === 'pickup'
-      : p.fulfillment === 'delivery' && (p.rota ?? 'Sem rota') === abaAtual)
+  const pickup = abaAtual === 'Pick-up'
+  const paradas = useMemo(() => (data ?? []).filter((p) =>
+    pickup ? p.fulfillment === 'pickup'
+      : p.fulfillment === 'delivery' && (p.rota ?? 'Sem rota') === abaAtual),
+  [data, abaAtual, pickup])
 
   // §6.7: a coluna Coletar vem da lista priorizada de bags
   const coletarPorCliente = useMemo(() => {
@@ -72,6 +86,9 @@ function Folha({ weekId, entrega, iso }: { weekId: string; entrega: string; iso:
   const bagsAEnviar = paradas.reduce(
     (s, p) => s + (p.montado || p.fulfillment !== 'delivery' ? 0 : p.bag_qty), 0)
 
+  const trocarAba = (r: string) => setParams((q) => { q.set('rota', r); return q })
+  const trocarVisao = (v: Visao) => setParams((q) => { q.set('visao', v); return q })
+
   return (
     <div className="p-5 flex flex-col gap-4">
       <header className="flex items-center gap-3 flex-wrap print:hidden">
@@ -80,12 +97,35 @@ function Folha({ weekId, entrega, iso }: { weekId: string; entrega: string; iso:
           <strong className="text-brand">{iso.replace(/^\d+-/, '')}</strong>
           {' · entrega dom '}{new Date(entrega).toLocaleDateString('pt-BR')}
         </span>
+
+        <div className="flex rounded-lg border border-line overflow-hidden">
+          {(['cozinha', 'driver'] as Visao[]).map((v) => (
+            <button key={v} onClick={() => trocarVisao(v)}
+              aria-pressed={visao === v}
+              className={`px-3.5 py-1.5 text-[12.5px] font-semibold ${
+                visao === v ? 'bg-brand text-cream' : 'bg-surface text-ink-2 hover:bg-muted-bg'}`}>
+              {v === 'cozinha' ? '👩‍🍳 Cozinha' : '🚚 Driver'}
+            </button>
+          ))}
+        </div>
+
         <div className="flex-1" />
         <button onClick={() => window.print()}
           className="bg-brand hover:bg-brand-hover text-cream rounded-lg px-4 py-2 text-[12.5px] font-semibold">
-          Imprimir folha da rota
+          Imprimir folha {visao === 'driver' ? 'do driver' : 'da cozinha'}
         </button>
       </header>
+
+      {/* só no papel: sem isto a folha impressa não diz de quem é nem de quando */}
+      <div className="hidden print:block mb-2">
+        <strong className="text-[14px]">
+          {visao === 'driver' ? 'Folha do driver' : 'Folha da cozinha'} · {abaAtual}
+        </strong>
+        <span className="text-[12px]">
+          {' — '}{iso.replace(/^\d+-/, '')}, entrega dom{' '}
+          {new Date(entrega).toLocaleDateString('pt-BR')}
+        </span>
+      </div>
 
       {abas.length === 0 ? (
         <section className="bg-surface border border-line rounded-xl">
@@ -103,7 +143,7 @@ function Folha({ weekId, entrega, iso }: { weekId: string; entrega: string; iso:
                 (r === 'Pick-up' ? p.fulfillment === 'pickup'
                   : p.fulfillment === 'delivery' && (p.rota ?? 'Sem rota') === r) && p.montado).length
               return (
-                <button key={r} onClick={() => setAba(r)}
+                <button key={r} onClick={() => trocarAba(r)}
                   className={`rounded-lg px-3.5 py-1.5 text-[12.5px] border ${
                     abaAtual === r ? 'bg-brand border-brand text-cream font-semibold'
                                    : 'bg-surface border-line text-ink-2 hover:border-brand'}`}>
@@ -113,7 +153,7 @@ function Folha({ weekId, entrega, iso }: { weekId: string; entrega: string; iso:
             })}
           </div>
 
-          <div className="bg-surface border border-line rounded-xl px-4 py-2.5 flex items-center gap-4 flex-wrap">
+          <div className="bg-surface border border-line rounded-xl px-4 py-2.5 flex items-center gap-4 flex-wrap print:hidden">
             <span className="text-[12.5px] font-semibold text-brand">
               {abaAtual} · {montados} de {paradas.length} montados
             </span>
@@ -121,9 +161,7 @@ function Folha({ weekId, entrega, iso }: { weekId: string; entrega: string; iso:
               <div className="h-full bg-brand-mid"
                 style={{ width: `${paradas.length ? (montados / paradas.length) * 100 : 0}%` }} />
             </div>
-            {abaAtual !== 'Pick-up' && (
-              <span className="text-[12px] text-ink-3">{bagsAEnviar} bags a enviar</span>
-            )}
+            {!pickup && <span className="text-[12px] text-ink-3">{bagsAEnviar} bags a enviar</span>}
           </div>
 
           {erro && (
@@ -133,38 +171,30 @@ function Folha({ weekId, entrega, iso }: { weekId: string; entrega: string; iso:
             </div>
           )}
 
-          <section className="bg-surface border border-line rounded-xl overflow-x-auto">
-            <table className="w-full text-[12.5px]">
-              <thead>
-                <tr className="bg-surface-alt text-[10px] uppercase tracking-wide text-ink-muted">
-                  <th className="w-8 text-center font-semibold py-2">#</th>
-                  <th className="text-left font-semibold px-3 min-w-44">Cliente</th>
-                  {abaAtual !== 'Pick-up' && (
-                    <th className="text-left font-semibold px-3 min-w-40">Endereço</th>
-                  )}
-                  <th className="text-left font-semibold px-3 min-w-72">Pedido</th>
-                  <th className="w-16 text-center font-semibold">Montado</th>
-                  {abaAtual !== 'Pick-up' && <th className="w-14 text-center font-semibold">Bags</th>}
-                  <th className="w-12 text-center font-semibold">Gelo</th>
-                  {abaAtual !== 'Pick-up' && <th className="w-16 text-center font-semibold">Coletar</th>}
-                  <th className="text-left font-semibold px-3 min-w-36">Notas</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paradas.map((p, i) => (
-                  <Linha key={p.order_id} n={i + 1} p={p} pickup={abaAtual === 'Pick-up'}
-                    coletar={coletarPorCliente.get(p.cliente)?.balance ?? 0}
-                    onErro={setErro}
-                    onMudou={() => { setErro(null); reload(); bags.reload() }} />
-                ))}
-              </tbody>
-            </table>
-          </section>
+          <Tabela
+            paradas={paradas} visao={visao} pickup={pickup}
+            coletarPorCliente={coletarPorCliente}
+            onErro={setErro}
+            onMudou={() => { setErro(null); reload(); bags.reload() }}
+          />
 
           <p className="text-[11.5px] text-ink-muted print:hidden">
-            Marcar <strong className="text-ink-2">Montado</strong> registra o envio das bags
-            no controle. A coluna <strong className="text-late-text">Coletar</strong> vem da
-            lista priorizada em Bags. Rota é editável por cliente — o ZIP só sugere.
+            {visao === 'cozinha' ? (
+              <>
+                Marcar <strong className="text-ink-2">Montado</strong> registra o envio das
+                bags no controle. A coluna <strong className="text-late-text">Coletar</strong>{' '}
+                vem da lista priorizada em Bags. Tamanho{' '}
+                <strong className="text-late-text">Large</strong> e{' '}
+                <strong className="text-ink">Small</strong>; num pedido que mistura, o{' '}
+                <strong className="text-leaf">brasileiro</strong> sai em verde.
+              </>
+            ) : (
+              <>
+                A folha do driver não traz o pedido — só o que é preciso para entregar.
+                Arraste as linhas para pôr na ordem do trajeto; a ordem vale para as duas
+                folhas e fica salva.
+              </>
+            )}
           </p>
         </>
       )}
@@ -172,15 +202,119 @@ function Folha({ weekId, entrega, iso }: { weekId: string; entrega: string; iso:
   )
 }
 
-function Linha({
-  n, p, pickup, coletar, onMudou, onErro,
+/* ------------------------------------------------------------------ tabela */
+
+function Tabela({
+  paradas, visao, pickup, coletarPorCliente, onMudou, onErro,
 }: {
-  n: number; p: ParadaMontagem; pickup: boolean; coletar: number
+  paradas: ParadaMontagem[]
+  visao: Visao
+  pickup: boolean
+  coletarPorCliente: Map<string, SaldoBag>
+  onMudou: () => void
+  onErro: (m: string) => void
+}) {
+  // Ordem local para o arrasto não piscar: soltar reordena na hora e só
+  // depois o banco confirma. Sem isso a linha volta para o lugar antigo até a
+  // consulta terminar, e parece que o arrasto não pegou.
+  const [ordem, setOrdem] = useState<string[]>(() => paradas.map((p) => p.order_id))
+  const [arrastando, setArrastando] = useState<string | null>(null)
+
+  useEffect(() => { setOrdem(paradas.map((p) => p.order_id)) }, [paradas])
+
+  const porId = new Map(paradas.map((p) => [p.order_id, p]))
+
+  // A ordem local só vale quando cobre EXATAMENTE as paradas desta aba. Trocar
+  // de rota troca `paradas` antes de o efeito rodar, e mapear a ordem antiga
+  // dava uma tabela vazia por um quadro — pisca na tela, e um teste que olha
+  // nesse instante conclui que a parada não existe.
+  const local = ordem.length === paradas.length
+    && paradas.every((p) => ordem.includes(p.order_id))
+  const lista = local ? (ordem.map((id) => porId.get(id)!)) : paradas
+
+  async function mover(de: number, para: number) {
+    if (de === para || para < 0 || para >= ordem.length) return
+    const nova = ordem.slice()
+    const [id] = nova.splice(de, 1)
+    nova.splice(para, 0, id)
+    setOrdem(nova)
+    const { error } = await ordenarEntrega(nova)
+    if (error) { onErro(error.message); return }
+    onMudou()
+  }
+
+  return (
+    <section className="bg-surface border border-line rounded-xl overflow-x-auto">
+      <table className="w-full text-[12.5px]">
+        <thead>
+          <tr className="bg-surface-alt text-[10px] uppercase tracking-wide text-ink-muted">
+            <th className="w-8 text-center font-semibold py-2">#</th>
+            <th className="text-left font-semibold px-3 min-w-44">Cliente</th>
+            {!pickup && <th className="text-left font-semibold px-3 min-w-40">Endereço</th>}
+            {visao === 'cozinha' && (
+              <th className="text-left font-semibold px-3 min-w-72">Pedido</th>
+            )}
+            {visao === 'cozinha' && <th className="w-16 text-center font-semibold">Montado</th>}
+            {!pickup && <th className="w-14 text-center font-semibold">Bags</th>}
+            {visao === 'cozinha' && <th className="w-12 text-center font-semibold">Gelo</th>}
+            {visao === 'cozinha' && !pickup && (
+              <th className="w-16 text-center font-semibold">Coletar</th>
+            )}
+            <th className="text-left font-semibold px-3 min-w-36">
+              {visao === 'driver' ? 'Notas de entrega' : 'Notas'}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {lista.map((p, i) => (
+            <Linha
+              key={p.order_id} n={i + 1} p={p} visao={visao} pickup={pickup}
+              coletar={coletarPorCliente.get(p.cliente)?.balance ?? 0}
+              arrastando={arrastando === p.order_id}
+              onArrastar={() => setArrastando(p.order_id)}
+              onSoltar={() => {
+                const de = ordem.indexOf(arrastando ?? '')
+                setArrastando(null)
+                if (de >= 0) void mover(de, i)
+              }}
+              onSubir={() => void mover(i, i - 1)}
+              onDescer={() => void mover(i, i + 1)}
+              onErro={onErro}
+              onMudou={onMudou}
+            />
+          ))}
+        </tbody>
+      </table>
+    </section>
+  )
+}
+
+/** A cor do prato na folha da cozinha (reunião de 22/09/2026).
+ *
+ *  Verde ganha do tamanho: num pedido que mistura clássico e brasileiro, o que
+ *  atrapalha é separar as duas linhas, não o tamanho — e é essa a troca que
+ *  acontece na bancada. */
+function corDoPrato(prato: PratoMontagem, misto: boolean) {
+  if (misto && prato.categoria === 'brasileiro') return 'text-leaf font-semibold'
+  if (prato.size === 'L') return 'text-late-text font-semibold'
+  return 'text-ink'
+}
+
+function Linha({
+  n, p, visao, pickup, coletar, arrastando,
+  onArrastar, onSoltar, onSubir, onDescer, onMudou, onErro,
+}: {
+  n: number; p: ParadaMontagem; visao: Visao; pickup: boolean; coletar: number
+  arrastando: boolean
+  onArrastar: () => void; onSoltar: () => void
+  onSubir: () => void; onDescer: () => void
   onMudou: () => void; onErro: (m: string) => void
 }) {
   const [ocupado, setOcupado] = useState(false)
   const [bags, setBags] = useState(String(p.bag_qty))
   const [salvandoBags, setSalvandoBags] = useState(false)
+
+  useEffect(() => { setBags(String(p.bag_qty)) }, [p.order_id, p.bag_qty])
 
   /** O banco recusa desmarcar quando já houve devolução, e a mensagem é escrita
    *  para quem está na folha ("ajuste a devolução primeiro"). Engolir o erro
@@ -206,10 +340,30 @@ function Linha({
   }
 
   return (
-    <tr className={`border-t border-line-soft ${p.montado ? 'bg-ok-bg/40' : ''}`}>
-      <td className="text-center py-2 font-bold text-brand tnum">{n}</td>
+    <tr
+      draggable={!pickup}
+      onDragStart={onArrastar}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={onSoltar}
+      className={`border-t border-line-soft ${p.montado ? 'bg-ok-bg/40' : ''} ${
+        arrastando ? 'opacity-50' : ''}`}
+    >
+      <td className="text-center py-2 font-bold text-brand tnum align-top">
+        {n}
+        {/* Arrastar sozinho não serve: não funciona no toque de muitos
+            navegadores e o teclado não alcança. Os dois botões são o mesmo
+            recurso por outro caminho. */}
+        {!pickup && (
+          <div className="flex flex-col items-center print:hidden">
+            <button onClick={onSubir} aria-label={`Subir ${p.cliente} na ordem de entrega`}
+              className="text-[9px] text-ink-muted hover:text-brand leading-none">▲</button>
+            <button onClick={onDescer} aria-label={`Descer ${p.cliente} na ordem de entrega`}
+              className="text-[9px] text-ink-muted hover:text-brand leading-none">▼</button>
+          </div>
+        )}
+      </td>
 
-      <td className="px-3 py-2">
+      <td className="px-3 py-2 align-top">
         <div className="text-[13px] font-bold text-ink">{p.cliente}</div>
         <div className="text-[11px] text-ink-3 tnum">{formatarTelefone(p.telefone)}</div>
         <div className="flex gap-1 flex-wrap mt-1">
@@ -220,73 +374,99 @@ function Linha({
       </td>
 
       {!pickup && (
-        <td className="px-3 py-2 text-ink-2">
+        <td className="px-3 py-2 text-ink-2 align-top">
           <div>{p.endereco ?? '—'}</div>
           <div className="text-[11px] text-ink-muted">{p.cidade ?? ''}</div>
         </td>
       )}
 
-      <td className="px-3 py-2">
-        <div className="text-[12.5px] font-bold text-ink">
-          {p.plano ?? '—'}{p.size && ` · ${p.size}`}
-        </div>
-        <div className="text-[11.5px] text-ink-2 leading-snug">{p.pratos || '—'}</div>
-        {p.adicionais && (
-          <div className="text-[11.5px] text-accent leading-snug mt-0.5">＋ {p.adicionais}</div>
-        )}
-      </td>
-
-      <td className="text-center py-2">
-        <button onClick={alternarMontado} disabled={ocupado}
-          aria-label={`${p.montado ? 'Desmarcar' : 'Marcar'} ${p.cliente} como montado`}
-          className={`w-6 h-6 rounded-md border-2 grid place-items-center text-[14px] font-bold ${
-            p.montado ? 'bg-brand border-brand text-lime' : 'bg-surface border-line-strong'}`}>
-          {p.montado ? '✓' : ''}
-        </button>
-      </td>
-
-      {!pickup && (
-        <td className="text-center py-2">
-          <input
-            aria-label={`Bags de ${p.cliente}`}
-            value={bags}
-            disabled={salvandoBags}
-            inputMode="numeric"
-            onChange={(e) => setBags(apenasDigitos(e.target.value))}
-            onBlur={salvarBags}
-            onKeyDown={(e) => { if (e.key === 'Enter') void salvarBags() }}
-            className={`w-10 text-center border rounded-md py-0.5 outline-none tnum font-bold ${
-              salvandoBags
-                ? 'border-brand bg-leaf-bg text-brand'
-                : 'border-line-strong bg-surface-alt focus:border-brand'}`}
-          />
+      {visao === 'cozinha' && (
+        <td className="px-3 py-2 align-top">
+          <div className="text-[12.5px] font-bold text-ink">
+            {p.plano ?? '—'}{p.size && ` · ${p.size}`}
+          </div>
+          <div className="text-[11.5px] leading-snug">
+            {p.pratos.length === 0 ? '—' : p.pratos.map((d, k) => (
+              <span key={k}>
+                {k > 0 && <span className="text-line-strong"> · </span>}
+                <span className={corDoPrato(d, p.misto)}>
+                  {d.nome} ×{d.qty}{d.size && ` (${d.size})`}
+                </span>
+              </span>
+            ))}
+          </div>
+          {p.adicionais && (
+            <div className="text-[11.5px] text-accent leading-snug mt-0.5">＋ {p.adicionais}</div>
+          )}
         </td>
       )}
 
-      <td className="text-center py-2">
-        <button
-          onClick={async () => {
-            const { error } = await marcarGelo(p.order_id, !p.gelo)
-            if (error) { onErro(error.message); return }
-            onMudou()
-          }}
-          aria-label={`${p.gelo ? 'Desmarcar' : 'Marcar'} gelo de ${p.cliente}`}
-          className={`w-6 h-6 rounded-md border-2 grid place-items-center text-[14px] font-bold ${
-            p.gelo ? 'bg-brand border-brand text-lime' : 'bg-surface border-line-strong'}`}>
-          {p.gelo ? '✓' : ''}
-        </button>
-      </td>
+      {visao === 'cozinha' && (
+        <td className="text-center py-2 align-top">
+          <button onClick={alternarMontado} disabled={ocupado}
+            aria-label={`${p.montado ? 'Desmarcar' : 'Marcar'} ${p.cliente} como montado`}
+            className={`w-6 h-6 rounded-md border-2 grid place-items-center text-[14px] font-bold ${
+              p.montado ? 'bg-brand border-brand text-lime' : 'bg-surface border-line-strong'}`}>
+            {p.montado ? '✓' : ''}
+          </button>
+        </td>
+      )}
 
       {!pickup && (
-        <td className={`text-center py-2 font-bold tnum ${coletar ? 'text-late-text' : 'text-line-strong'}`}>
+        <td className="text-center py-2 align-top">
+          {visao === 'cozinha' ? (
+            <input
+              aria-label={`Bags de ${p.cliente}`}
+              value={bags}
+              disabled={salvandoBags}
+              inputMode="numeric"
+              onChange={(e) => setBags(apenasDigitos(e.target.value))}
+              onBlur={salvarBags}
+              onKeyDown={(e) => { if (e.key === 'Enter') void salvarBags() }}
+              className={`w-10 text-center border rounded-md py-0.5 outline-none tnum font-bold ${
+                salvandoBags
+                  ? 'border-brand bg-leaf-bg text-brand'
+                  : 'border-line-strong bg-surface-alt focus:border-brand'}`}
+            />
+          ) : (
+            /* O driver LÊ quantas bags leva; quem altera é a cozinha, que é
+               quem conta na hora de fechar a sacola. */
+            <span className="tnum font-bold text-ink">{p.bag_qty}</span>
+          )}
+        </td>
+      )}
+
+      {visao === 'cozinha' && (
+        <td className="text-center py-2 align-top">
+          <button
+            onClick={async () => {
+              const { error } = await marcarGelo(p.order_id, !p.gelo)
+              if (error) { onErro(error.message); return }
+              onMudou()
+            }}
+            aria-label={`${p.gelo ? 'Desmarcar' : 'Marcar'} gelo de ${p.cliente}`}
+            className={`w-6 h-6 rounded-md border-2 grid place-items-center text-[14px] font-bold ${
+              p.gelo ? 'bg-brand border-brand text-lime' : 'bg-surface border-line-strong'}`}>
+            {p.gelo ? '✓' : ''}
+          </button>
+        </td>
+      )}
+
+      {visao === 'cozinha' && !pickup && (
+        <td className={`text-center py-2 font-bold tnum align-top ${
+          coletar ? 'text-late-text' : 'text-line-strong'}`}>
           {coletar || '—'}
         </td>
       )}
 
-      <td className="px-3 py-2 text-[11.5px] text-ink-3 leading-snug">
+      <td className="px-3 py-2 text-[11.5px] text-ink-3 leading-snug align-top">
         {p.delivery_notes && <div>🚚 {p.delivery_notes}</div>}
-        {p.office_notes && <div className="text-ink-muted">🗒️ {p.office_notes}</div>}
-        {!p.delivery_notes && !p.office_notes && '—'}
+        {/* nota de escritório é recado interno de montagem — não vai na folha
+            do carro, que a pessoa lê na porta do cliente */}
+        {visao === 'cozinha' && p.office_notes && (
+          <div className="text-ink-muted">🗒️ {p.office_notes}</div>
+        )}
+        {!p.delivery_notes && (visao === 'driver' || !p.office_notes) && '—'}
       </td>
     </tr>
   )

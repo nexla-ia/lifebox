@@ -61,7 +61,13 @@ async function abrirFolha(page: Page) {
 
   for (let i = 0; i < (await abas.count()); i++) {
     await abas.nth(i).click()
-    if (await linha.isVisible()) return linha
+    // ESPERA, não `isVisible()` na hora: a aba mora na URL, então trocar é uma
+    // navegação, e conferir no mesmo instante lê a tabela anterior. O teste
+    // desistia da aba certa e acusava que a parada não existia.
+    const achou = await linha.first()
+      .waitFor({ state: 'visible', timeout: 3_000 })
+      .then(() => true, () => false)
+    if (achou) return linha
   }
   throw new Error(`a parada de ${cliente} não apareceu em nenhuma aba da folha`)
 }
@@ -105,6 +111,51 @@ test.describe('montagem e bags', () => {
     await expect(linha).toContainText('Deixar na porta lateral')
     // kitchen notes NÃO: essas são da folha da cozinha (§6.8)
     await expect(linha).not.toContainText('Sem cebola')
+  })
+
+  // Reunião de 22/09/2026: duas folhas, e as duas são para IMPRIMIR.
+  test('a folha do driver não traz o pedido, e a da cozinha traz', async ({ page }) => {
+    await entrar(page)
+    const linha = await abrirFolha(page)
+
+    // cozinha: o pedido inteiro, com as colunas de conferência
+    await expect(linha).toContainText(`Prato ${marca}`)
+    await expect(botao(linha, `Marcar ${cliente} como montado`)).toBeVisible()
+    await expect(linha.getByLabel(`Bags de ${cliente}`)).toBeVisible()
+
+    await page.getByRole('button', { name: /Driver/ }).click()
+
+    // driver: nome, telefone, endereço, bags e notas de entrega. O que vai
+    // DENTRO da sacola não é da conta de quem dirige — e sem o pedido a folha
+    // do carro cabe numa página.
+    const noDriver = linhaDo(page)
+    await expect(noDriver).toBeVisible({ timeout: 20_000 })
+    await expect(noDriver).toContainText(cliente)
+    await expect(noDriver).not.toContainText(`Prato ${marca}`)
+    await expect(botao(noDriver, `Marcar ${cliente} como montado`)).toHaveCount(0)
+    // bags aparece, mas só de leitura: quem conta é a cozinha, ao fechar
+    await expect(noDriver.getByLabel(`Bags de ${cliente}`)).toHaveCount(0)
+
+    // a visão mora na URL — imprimir a folha do driver é mandar um link
+    await expect(page).toHaveURL(/visao=driver/)
+    await page.reload()
+    await expect(linhaDo(page)).not.toContainText(`Prato ${marca}`, { timeout: 20_000 })
+  })
+
+  test('a ordem de entrega é definida na folha e fica salva', async ({ page }) => {
+    await entrar(page)
+    const linha = await abrirFolha(page)
+    await expect(linha).toBeVisible()
+
+    // Uma parada só na aba não dá para reordenar, e forçar uma segunda seria
+    // criar pedido de teste no banco da cliente. O que se prova é que o
+    // controle existe, funciona e não estoura — a ordem em si está presa no
+    // teste SQL de fn_ordenar_entrega.
+    const descer = botao(linha, `Descer ${cliente} na ordem de entrega`)
+    await expect(descer).toBeVisible()
+    await descer.click()
+    await expect(page.getByRole('alert')).toHaveCount(0)
+    await expect(linhaDo(page)).toBeVisible({ timeout: 20_000 })
   })
 
   test('gelo é conferência separada de montado', async ({ page }) => {

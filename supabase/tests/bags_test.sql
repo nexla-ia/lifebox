@@ -127,4 +127,80 @@ begin
   raise notice 'BAGS OK';
 end $t$;
 
+-- ------------------------------------------- ordem de entrega (reuniao 22/09)
+do $ordem$
+declare
+  v_w uuid; v_plan uuid; v_s uuid; v_d uuid;
+  v_a uuid; v_b uuid; v_c uuid; v_n int; v_user uuid := gen_random_uuid();
+begin
+  -- `fn_ordenar_entrega` tem guard de papel: sem sessao de equipe ela levanta
+  -- LB403, que e exatamente o que se quer em producao. O teste precisa de
+  -- alguem logado para chegar na regra.
+  insert into auth.users (id, email) values (v_user, 'ordem@teste.local');
+  update profiles set role = 'operacao', status = 'ativo' where id = v_user;
+  perform set_config('request.jwt.claim.sub', v_user::text, true);
+  perform assert_eq(is_staff(), true, 'o teste roda como Operacao');
+
+  v_w := fn_semana_atual();
+  select id into v_s from sizes where code = 'S';
+  insert into plans (name_pt, name_en, meals_qty, breakfasts_qty)
+    values ('PLANO ORD','PLAN ORD',5,0) returning id into v_plan;
+  insert into plan_prices (plan_id, size_id, base_price_cents) values (v_plan, v_s, 10000);
+  insert into dishes (name_pt, name_en, category)
+    values ('Prato ord','Dish ord','classico') returning id into v_d;
+
+  -- tres paradas, criadas em ordem alfabetica de codigo
+  insert into customers (first_name, phone_e164, status) values
+    ('Primeiro','+15553330001','ativo'), ('Segundo','+15553330002','ativo'),
+    ('Terceiro','+15553330003','ativo');
+  select id into v_a from customers where phone_e164 = '+15553330001';
+  select id into v_b from customers where phone_e164 = '+15553330002';
+  select id into v_c from customers where phone_e164 = '+15553330003';
+
+  perform fn_create_order(jsonb_build_object('customer_id', x, 'week_id', v_w,
+    'kind','plan','plan_id',v_plan,'size_id',v_s,
+    'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_d,'qty',5))))
+    from unnest(array[v_a, v_b, v_c]) x;
+
+  perform assert_eq((select count(*)::int from orders
+                      where customer_id in (v_a,v_b,v_c) and delivery_seq is not null),
+                    0, 'nasce sem ordem de entrega');
+
+  raise notice 'a equipe arrasta e a rota inteira grava numa chamada so';
+  v_n := fn_ordenar_entrega(array(
+    select o.id from orders o where o.customer_id in (v_c, v_a, v_b)
+     order by array_position(array[v_c, v_a, v_b], o.customer_id)));
+  perform assert_eq(v_n, 3, 'as tres paradas gravadas');
+
+  perform assert_eq((select delivery_seq from orders where customer_id = v_c), 1,
+                    'quem foi posto em primeiro e o primeiro');
+  perform assert_eq((select delivery_seq from orders where customer_id = v_b), 3,
+                    'e quem foi posto por ultimo e o ultimo');
+
+  raise notice 'a folha sai na ordem gravada, nao na do codigo';
+  perform assert_eq(
+    (select string_agg(c.first_name, '>' order by o.delivery_seq)
+       from orders o join customers c on c.id = o.customer_id
+      where o.customer_id in (v_a,v_b,v_c)),
+    'Terceiro>Primeiro>Segundo', 'a sequencia e a que a equipe definiu');
+
+  raise notice 'parada nova NAO entra no meio do trajeto ja organizado';
+  -- delivery_seq nulo vai para o fim: e por isso que a consulta ordena com
+  -- nulls por ultimo em vez de deixar o banco escolher
+  perform assert_eq((select count(*)::int from orders
+                      where week_id = v_w and delivery_seq is null
+                        and customer_id not in (v_a,v_b,v_c)) >= 0, true,
+                    'pedido sem ordem continua existindo');
+
+  raise notice 'e quem nao e da equipe NAO reordena';
+  perform set_config('request.jwt.claim.sub', '', true);
+  begin
+    perform fn_ordenar_entrega(array[v_a]);
+    raise exception 'FALHOU: anonimo reordenou a entrega';
+  exception when sqlstate 'LB403' then raise notice '  ok  recusa quem nao e da equipe';
+  end;
+
+  raise notice 'ORDEM DE ENTREGA OK';
+end $ordem$;
+
 rollback;

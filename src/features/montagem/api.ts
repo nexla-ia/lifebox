@@ -3,6 +3,19 @@ import { supabase } from '../../lib/supabase'
 /* Montagem de domingo e bags térmicas.
  * Ref: LIFEBOX_PROJECT.md §6.7, §9.9, §9.10 · telas 11a, 11b, 11c, 11f. */
 
+/** Um prato da sacola, com o que a folha da cozinha precisa para COLORIR.
+ *
+ *  Large sai alaranjado e Small preto (reunião de 22/09/2026): quem monta
+ *  separa por tamanho, e a cor evita trocar a marmita na hora de fechar. E
+ *  quando o pedido mistura clássico com brasileiro, o brasileiro fica verde —
+ *  é a confusão que mais acontece, porque os dois vão na mesma sacola. */
+export type PratoMontagem = {
+  nome: string
+  qty: number
+  size: string | null
+  categoria: string | null
+}
+
 export type ParadaMontagem = {
   order_id: string
   code: string
@@ -15,7 +28,9 @@ export type ParadaMontagem = {
   fulfillment: 'delivery' | 'pickup'
   plano: string | null
   size: string | null
-  pratos: string
+  pratos: PratoMontagem[]
+  /** mistura clássico e brasileiro — é o que liga o verde */
+  misto: boolean
   adicionais: string
   bag_qty: number
   montado: boolean
@@ -24,6 +39,7 @@ export type ParadaMontagem = {
   delivery_notes: string | null
   office_notes: string | null
   entregar_com: string | null
+  delivery_seq: number | null
 }
 
 export async function fetchMontagem(weekId: string) {
@@ -31,14 +47,18 @@ export async function fetchMontagem(weekId: string) {
     .from('orders')
     .select(`
       id, code, bag_qty, assembled_at, ice_packed, post_cutoff, fulfillment,
-      deliver_with_order_id,
+      deliver_with_order_id, delivery_seq,
       plans(name_pt), sizes!orders_size_id_fkey(code),
       customers!inner(first_name, last_name, phone_e164, street_address, city,
                       delivery_notes, office_notes,
                       routes(id, name)),
-      order_items(item_type, name_snapshot, qty, position, sizes(code))
+      order_items(item_type, name_snapshot, qty, position, category_snapshot,
+                  sizes(code))
     `)
     .eq('week_id', weekId)
+    // quem ainda não foi classificado vai para o FIM, na ordem do código:
+    // parada nova não pode cair no meio de um trajeto já organizado
+    .order('delivery_seq', { ascending: true, nullsFirst: false })
     .order('code')
 
   if (error) return { data: null, error: { message: error.message } }
@@ -47,7 +67,7 @@ export async function fetchMontagem(weekId: string) {
     id: string; code: string; bag_qty: number; assembled_at: string | null
     ice_packed: boolean
     post_cutoff: boolean; fulfillment: 'delivery' | 'pickup'
-    deliver_with_order_id: string | null
+    deliver_with_order_id: string | null; delivery_seq: number | null
     plans: { name_pt: string } | null
     sizes: { code: string } | null
     customers: {
@@ -58,7 +78,7 @@ export async function fetchMontagem(weekId: string) {
     }
     order_items: {
       item_type: string; name_snapshot: string; qty: number
-      position: number | null
+      position: number | null; category_snapshot: string | null
       sizes: { code: string } | null
     }[]
   }
@@ -89,10 +109,15 @@ export async function fetchMontagem(weekId: string) {
         fulfillment: o.fulfillment,
         plano: o.plans?.name_pt ?? null,
         size: o.sizes?.code ?? null,
-        // a folha lista o que vai na sacola, agrupado por tamanho
-        pratos: pratos
-          .map((i) => `${i.name_snapshot} ×${i.qty}${i.sizes?.code ? ` (${i.sizes.code})` : ''}`)
-          .join(' · '),
+        // estruturado, não texto: a folha da cozinha colore prato a prato
+        pratos: pratos.map((i) => ({
+          nome: i.name_snapshot,
+          qty: i.qty,
+          size: i.sizes?.code ?? o.sizes?.code ?? null,
+          categoria: i.category_snapshot,
+        })),
+        misto: pratos.some((i) => i.category_snapshot === 'brasileiro')
+            && pratos.some((i) => i.category_snapshot === 'classico'),
         adicionais: addons.map((i) => `${i.name_snapshot} ×${i.qty}`).join(' · '),
         bag_qty: o.bag_qty,
         montado: o.assembled_at !== null,
@@ -103,10 +128,15 @@ export async function fetchMontagem(weekId: string) {
         entregar_com: comp
           ? `${comp.customers.first_name} ${comp.customers.last_name ?? ''}`.trim()
           : null,
+        delivery_seq: o.delivery_seq,
       }
     }) satisfies ParadaMontagem[],
   }
 }
+
+/** Grava a ordem da rota inteira numa chamada. Ver fn_ordenar_entrega. */
+export const ordenarEntrega = (ids: string[]) =>
+  supabase.rpc('fn_ordenar_entrega', { p_ids: ids })
 
 export const marcarGelo = (orderId: string, ice_packed: boolean) =>
   supabase.from('orders').update({ ice_packed }).eq('id', orderId)
