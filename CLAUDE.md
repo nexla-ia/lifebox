@@ -345,9 +345,28 @@ plano com preço ou sem prato no menu da semana, o link quebra de quatro jeitos
 diferentes e todos em silêncio.
 
 Tudo que a tela checa, o servidor checa de novo, porque a tela é do cliente:
-cutoff (§4), ZIP atendido (§6.1), formato do telefone e pedido duplicado na
-semana. Cada caso tem SQLSTATE próprio (`LB400`, `LB409`, `LB422`, `LB423`,
+cutoff (§4), ZIP atendido (§6.1), formato do telefone, pedido duplicado na
+semana, **quantidade dentro do teto, prato no menu DA SEMANA e catálogo
+ativo**. Cada caso tem SQLSTATE próprio (`LB400`, `LB409`, `LB422`, `LB423`,
 `LB429`) para a tela dizer o que fazer em vez de um erro genérico.
+
+Os três últimos vieram de auditoria (28/09/2026), medidos pelo endpoint público
+sem login: `qty: 99999` criava pedido de US$ 1,19 milhão e mandava a cozinha
+fazer 99.999 porções; `qty: -5` **sumia em silêncio**, e o cliente receberia a
+menos; prato fora do menu e catálogo desativado entravam normalmente. Nenhum
+reduzia dinheiro — o estrago era a semana ficar ilegível e a folha da cozinha
+virar impossível. O teto é `max_item_qty` em `settings`, editável, porque um
+dia vai haver pedido de festa. **A prévia recusa o que o fechamento recusaria**:
+checar só no fim faria a pessoa montar o pedido inteiro para descobrir no botão.
+
+**View que ignora a RLS é porta de serviço, e porta de serviço não abre para a
+rua.** `v_production` e `v_kitchen_notes` são `security_invoker = false` de
+propósito — é assim que a Cozinha vê pedido sem alcançar `orders` — e por isso
+mesmo não têm defesa própria: quem tiver SELECT nelas vê tudo. O `anon` tinha,
+e `v_kitchen_notes` leva nome de cliente junto com a restrição alimentar.
+Fechado na migration 20260928160000; `link_test.sql` agora cobra a lista das
+views também, não só a das funções — foi exatamente o que faltou quando fechei
+as funções e deixei as views de fora.
 
 Rate limit: por **telefone** curto (6 consultas/10min, 3 pedidos/30min), por
 **IP** folgado (30 e 12). Quem varre cadastro troca de número, então quem barra

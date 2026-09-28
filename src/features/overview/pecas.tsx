@@ -58,7 +58,12 @@ export function Card({
  *  Um ponto só, ou todos iguais, não vira gráfico: melhor não desenhar do que
  *  desenhar uma linha reta que parece estabilidade medida. */
 export function Sparkline({ pontos }: { pontos: (number | null)[] }) {
-  const vals = pontos.map((p) => p ?? 0)
+  // NULO NÃO É ZERO, e desenhá-lo como zero é a mesma mentira que o projeto
+  // recusa no bloco de leads: uma semana sem pedido pago não tem ticket médio,
+  // e um mergulho até o chão se leria como desempenho péssimo em vez de
+  // ausência de conta. Ponto nulo tira a série inteira do ar.
+  if (pontos.some((p) => p == null)) return null
+  const vals = pontos as number[]
   if (vals.length < 2) return null
   const min = Math.min(...vals)
   const max = Math.max(...vals)

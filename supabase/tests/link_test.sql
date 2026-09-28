@@ -296,6 +296,87 @@ begin
   raise notice 'LINK OK';
 end $t$;
 
+-- ------------------------------------ o que o link NAO pode aceitar (§9.7)
+do $hostil$
+declare
+  v_w uuid; v_p uuid; v_s uuid; v_d uuid; v_fora uuid; r jsonb;
+begin
+  v_w := fn_semana_atual();
+  select id into v_s from sizes where code = 'S';
+  select id into v_p from plans where active and meals_qty = 5 and breakfasts_qty = 0 limit 1;
+  select md.dish_id into v_d from menu_dishes md join weeks w on w.menu_id = md.menu_id
+   where w.id = v_w limit 1;
+  select d.id into v_fora from dishes d
+   where not exists (select 1 from menu_dishes md join weeks w on w.menu_id = md.menu_id
+                      where w.id = v_w and md.dish_id = d.id) limit 1;
+
+  -- Achados em auditoria, todos pelo endpoint PUBLICO e sem login. Nenhum
+  -- reduzia dinheiro; o estrago era outro — a folha da cozinha mandando fazer
+  -- 99.999 porcoes, e a semana inteira ilegivel.
+  raise notice 'quantidade acima do teto e recusada';
+  begin
+    perform fn_link_precificar(jsonb_build_object(
+      'kind','plan','plan_id',v_p,'size_id',v_s,'fulfillment','delivery',
+      'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_d,'qty',99999))));
+    raise exception 'FALHOU: aceitou 99999 de um item';
+  exception when sqlstate 'LB422' then raise notice '  ok  recusa quantidade absurda';
+  end;
+
+  raise notice 'quantidade negativa e recusada, nao ignorada';
+  -- antes a linha SUMIA: o cliente recebia a menos e ninguem via
+  begin
+    perform fn_link_precificar(jsonb_build_object(
+      'kind','plan','plan_id',v_p,'size_id',v_s,'fulfillment','delivery',
+      'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_d,'qty',-5))));
+    raise exception 'FALHOU: aceitou quantidade negativa';
+  exception when sqlstate 'LB422' then raise notice '  ok  recusa quantidade negativa';
+  end;
+
+  raise notice 'prato fora do menu da semana e recusado';
+  if v_fora is null then raise notice '  -- sem prato fora do menu para testar';
+  else
+    begin
+      perform fn_link_precificar(jsonb_build_object(
+        'kind','plan','plan_id',v_p,'size_id',v_s,'fulfillment','delivery',
+        'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_fora,'qty',2))));
+      raise exception 'FALHOU: aceitou prato fora do menu';
+    exception when sqlstate 'LB422' then raise notice '  ok  recusa prato fora do menu';
+    end;
+  end if;
+
+  raise notice 'catalogo desativado e recusado';
+  update plans set active = false where id = v_p;
+  begin
+    perform fn_link_precificar(jsonb_build_object(
+      'kind','plan','plan_id',v_p,'size_id',v_s,'fulfillment','delivery',
+      'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_d,'qty',5))));
+    raise exception 'FALHOU: aceitou plano desativado';
+  exception when sqlstate 'LB422' then raise notice '  ok  recusa plano desativado';
+  end;
+  update plans set active = true where id = v_p;
+
+  raise notice 'e o pedido normal continua passando';
+  r := fn_link_precificar(jsonb_build_object(
+    'kind','plan','plan_id',v_p,'size_id',v_s,'fulfillment','delivery',
+    'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_d,'qty',5))));
+  perform assert_eq((r->>'total_cents')::int > 0, true, 'a previa boa nao foi afetada');
+
+  raise notice 'e a PREVIA recusa o que o fechamento recusaria';
+  -- se so o fechamento checasse, a pessoa montaria o pedido inteiro e
+  -- descobriria no botao final
+  begin
+    perform fn_link_criar_pedido(jsonb_build_object(
+      'phone','+15085550188','first_name','Hostil',
+      'zip_code',(select zip from zip_codes limit 1),'city','X',
+      'kind','plan','plan_id',v_p,'size_id',v_s,'fulfillment','delivery',
+      'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_d,'qty',99999))));
+    raise exception 'FALHOU: fechou pedido com quantidade absurda';
+  exception when sqlstate 'LB422' then raise notice '  ok  o fechamento recusa igual';
+  end;
+
+  raise notice 'HOSTIL OK';
+end $hostil$;
+
 -- ---------------------------------------------------- a porta e so a funcao
 -- Os dois ambientes barram o anon de formas diferentes, e as duas valem:
 -- no cluster local ele nao tem GRANT e leva 42501; no Supabase o bootstrap ja
@@ -382,6 +463,35 @@ begin
       array_to_string(v_falhas, ', ');
   end if;
   raise notice '  ok  so as funcoes do link e do convite abrem para o anon';
+
+  -- E A MESMA LISTA PARA AS VIEWS. Faltava, e custou caro: `v_production` e
+  -- `v_kitchen_notes` sao `security_invoker = false` de proposito — e a porta
+  -- da Cozinha, que precisa ver pedido sem alcancar `orders`. Justamente por
+  -- isso elas NAO tem RLS para barrar ninguem: quem tem SELECT ve tudo. O anon
+  -- tinha, e `v_kitchen_notes` leva nome de cliente junto com a restricao
+  -- alimentar.
+  select array_agg(c.relname order by c.relname) into v_falhas
+    from pg_class c join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public' and c.relkind = 'v'
+     and has_table_privilege('anon', c.oid, 'select');
+  if coalesce(array_length(v_falhas, 1), 0) > 0 then
+    raise exception 'FALHOU: anon alcanca view: %', array_to_string(v_falhas, ', ');
+  end if;
+  raise notice '  ok  nenhuma view abre para o anon — o link passa por funcao';
+
+  -- view que ignora a RLS tem de ser rara e consciente: cada uma e uma porta
+  -- sem tranca, e so vale a pena quando ela E a tranca (a Cozinha, §3)
+  select array_agg(c.relname order by c.relname) into v_falhas
+    from pg_class c join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public' and c.relkind = 'v'
+     and coalesce((select option_value from pg_options_to_table(c.reloptions)
+                    where option_name = 'security_invoker'), 'false') <> 'true'
+     and c.relname not in ('v_production', 'v_kitchen_notes');
+  if coalesce(array_length(v_falhas, 1), 0) > 0 then
+    raise exception 'FALHOU: view nova ignora a RLS sem estar na lista: %',
+      array_to_string(v_falhas, ', ');
+  end if;
+  raise notice '  ok  so as duas views da Cozinha ignoram a RLS';
 
   if coalesce(array_length(v_falhas, 1), 0) > 0 then
     raise exception 'FALHOU: anon alcancou %', array_to_string(v_falhas, ', ');
