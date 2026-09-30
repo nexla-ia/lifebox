@@ -105,6 +105,47 @@ test.describe('pedidos', () => {
   // ficha mostra o pedido COMO FOI FECHADO — nome e preço vêm do snapshot de
   // order_items — e que o pedido aberto fica na URL, para recarregar no meio
   // da conferência não jogar de volta no quadro.
+  // §5.3: "3 Small + 3 Large" é o caso citado no documento, e é comum na
+  // operação real. O servidor sempre soube fazer — faltava a tela, que só
+  // tinha o botão "Personalizado" sem nada atrás.
+  test('Personalizado cobra por unidade e aceita tamanhos misturados',
+    async ({ page }) => {
+      await abrirFicha(page)
+      await page.getByLabel('Buscar cliente').fill(`Cliente ${marca}`)
+      await page.getByRole('button', { name: new RegExp(`Cliente ${marca}`) }).click()
+      await page.getByRole('button', { name: '✎ Personalizado' }).click()
+
+      // o unitário é cadastro, e a tela mostra qual é antes de somar nada.
+      // Não dá para escopar por "Personalizado": o cartão de Tipo de pedido
+      // também tem essa palavra, no botão.
+      await expect(page.getByText('/unidade').first())
+        .toBeVisible({ timeout: 20_000 })
+
+      // `exact` porque "Somar um Prato X Small" contém "Somar um Prato X":
+      // sem isso o seletor casa os dois tamanhos e o strict mode reclama
+      const somar = (nome: string) =>
+        page.getByRole('button', { name: `Somar um ${nome}`, exact: true })
+      await somar(`Prato ${marca} Small`).click()
+      await somar(`Prato ${marca} Small`).click()
+      await somar(`Prato ${marca} Large`).click()
+
+      // o resumo separa as duas linhas com o tamanho: sem isso apareceriam
+      // dois "Prato X" com preços diferentes e ninguém entenderia
+      const resumo = page.locator('section').filter({ hasText: 'Resumo' })
+      await expect(resumo).toContainText('(S)', { timeout: 20_000 })
+      await expect(resumo).toContainText('(L)')
+
+      // total do SERVIDOR, não somado aqui. O botão tem de repetir exatamente
+      // o que o resumo mostra: divergir entre os dois é a forma silenciosa de
+      // a pessoa confirmar um valor e o pedido sair com outro.
+      const total = (await totalNoResumo(page).innerText()).trim()
+      const salvar = page.getByRole('button', { name: /Salvar pedido/ })
+      await expect(salvar).toContainText(total)
+
+      await page.getByRole('button', { name: /Salvar pedido/ }).click()
+      await expect(page.getByText(/Pedido \w+-\d{4} criado/)).toBeVisible({ timeout: 20_000 })
+    })
+
   test('clicar no cartão abre a ficha do pedido, e ela sobrevive ao F5', async ({ page }) => {
     await abrirFicha(page)
     await montarPlano(page, 11)

@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { ErrorBoundary } from '../ui/ErrorBoundary'
 import { AppLayout } from '../ui/AppLayout'
 import { DeniedState, Loading } from '../ui/states'
 import { HOME_BY_ROLE, useAuth } from '../lib/auth'
@@ -49,7 +50,7 @@ export function AppRoutes() {
       {/* §9.7 · fora do AppLayout e sem guarda: quem abre o link não fez login
           e não tem perfil. Quem protege é a RLS — o role anon só alcança as
           funções fn_link_* (migration 1400). */}
-      <Route path="/pedido" element={<LinkPage />} />
+      <Route path="/pedido" element={<ErrorBoundary><LinkPage /></ErrorBoundary>} />
 
       {/* §3 · primeiro acesso: quem abre ainda não tem conta, então também
           fica fora do guarda. O token é a única credencial (migration 1600). */}
@@ -68,6 +69,10 @@ export function AppRoutes() {
             key={s.path}
             path={s.path}
             element={
+              /* `key` reseta o boundary ao trocar de tela: sem isso a tela que
+                 quebrou continua mostrando o erro depois de a pessoa clicar em
+                 outro item do menu, e o sistema parece travado de vez. */
+              <ErrorBoundary key={s.path}>
               <Guard path={s.path}>
                 {s.path === '/overview' ? <OverviewPage />
                   : s.path === '/catalogo' ? <CatalogoPage />
@@ -79,6 +84,7 @@ export function AppRoutes() {
                   : s.path === '/bags' ? <BagsPage />
                   : <EmDesenvolvimento screen={s} />}
               </Guard>
+              </ErrorBoundary>
             }
           />
         ))}

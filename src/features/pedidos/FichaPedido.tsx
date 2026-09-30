@@ -47,9 +47,18 @@ export function FichaPedido({ dados, onCancelar, onCriado }: Props) {
   const cliente = dados.clientes.find((c) => c.id === clienteId) ?? null
   const plano = dados.planos.find((p) => p.id === planId) ?? null
 
+  /* No Personalizado a quantidade é por PRATO E TAMANHO — o §5.3 cita
+   * "3 Small + 3 Large" como caso comum, e o preço é unitário por tamanho.
+   * Por isso a chave é `prato:tamanho` aqui, e só o prato no plano, onde o
+   * tamanho é um só para o pedido inteiro. */
   const items: ItemPedido[] = useMemo(() => [
     ...Object.entries(qtds).filter(([, q]) => q > 0)
-      .map(([dish_id, qty]) => ({ type: 'dish' as const, dish_id, qty })),
+      .map(([chave, qty]) => {
+        const [dish_id, size_id] = chave.split(':')
+        return size_id
+          ? { type: 'dish' as const, dish_id, size_id, qty }
+          : { type: 'dish' as const, dish_id, qty }
+      }),
     ...Object.entries(addonQtds).filter(([, q]) => q > 0)
       .map(([addon_id, qty]) => ({ type: 'addon' as const, addon_id, qty })),
   ], [qtds, addonQtds])
@@ -85,8 +94,13 @@ export function FichaPedido({ dados, onCancelar, onCriado }: Props) {
     }).slice(0, 6)
   }, [buscaCliente, dados.clientes])
 
-  const setQtd = (dishId: string, delta: number) =>
-    setQtds((q) => ({ ...q, [dishId]: Math.max(0, (q[dishId] ?? 0) + delta) }))
+  const setQtd = (chave: string, delta: number) =>
+    setQtds((q) => ({ ...q, [chave]: Math.max(0, (q[chave] ?? 0) + delta) }))
+
+  /* Trocar de tipo zera os pratos: as chaves mudam de formato (com e sem
+   * tamanho) e o que sobrasse viraria item fantasma — some da tela e continua
+   * indo para o servidor. */
+  useEffect(() => { setQtds({}) }, [kind])
 
   async function salvar() {
     setErro(null)
@@ -202,6 +216,33 @@ export function FichaPedido({ dados, onCancelar, onCriado }: Props) {
             )}
           </Cartao>
 
+          {kind === 'custom' && (
+            <Cartao titulo="Personalizado"
+              nota="preço unitário por tamanho, sem plano — o tamanho é escolhido prato a prato">
+              {dados.unitarios.length === 0 ? (
+                <p className="text-[12.5px] text-warn bg-warn-bg border border-warn-line rounded-lg px-3 py-2">
+                  Sem preço unitário cadastrado. Cadastre em Catálogo → Personalizado,
+                  senão o servidor recusa o pedido.
+                </p>
+              ) : (
+                <div className="flex gap-4 flex-wrap">
+                  {dados.tamanhos.map((t) => {
+                    const u = dados.unitarios.find((x) => x.size_id === t.id)
+                    return (
+                      <div key={t.id} className="text-[12.5px]">
+                        <span className="text-ink-3">{t.name}</span>{' '}
+                        <strong className="text-brand tnum">
+                          {u ? money(u.unit_price_cents) : '— sem preço'}
+                        </strong>
+                        <span className="text-ink-muted"> /unidade</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </Cartao>
+          )}
+
           {kind === 'plan' && (
             <Cartao titulo="Plano e tamanho">
               {dados.planos.length === 0 ? (
@@ -274,11 +315,30 @@ export function FichaPedido({ dados, onCancelar, onCriado }: Props) {
                                   <span className="text-[10.5px] text-ink-muted">{d.protein_tag}</span>
                                 )}
                               </div>
-                              <Stepper
-                                valor={qtds[d.id] ?? 0}
-                                rotulo={d.name_pt}
-                                onMudar={(delta) => setQtd(d.id, delta)}
-                              />
+                              {kind === 'custom' ? (
+                                // um contador por tamanho: é assim que "3 Small
+                                // + 3 Large do mesmo prato" existe (§5.3)
+                                <div className="flex gap-3 items-center">
+                                  {dados.tamanhos.map((t) => (
+                                    <div key={t.id} className="flex items-center gap-1.5">
+                                      <span className="text-[10.5px] font-bold text-ink-3 w-4">
+                                        {t.code}
+                                      </span>
+                                      <Stepper
+                                        valor={qtds[`${d.id}:${t.id}`] ?? 0}
+                                        rotulo={`${d.name_pt} ${t.name}`}
+                                        onMudar={(delta) => setQtd(`${d.id}:${t.id}`, delta)}
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <Stepper
+                                  valor={qtds[d.id] ?? 0}
+                                  rotulo={d.name_pt}
+                                  onMudar={(delta) => setQtd(d.id, delta)}
+                                />
+                              )}
                             </li>
                           ))}
                         </ul>
@@ -318,7 +378,7 @@ export function FichaPedido({ dados, onCancelar, onCriado }: Props) {
         </div>
 
         <div className="flex flex-col gap-4 lg:sticky lg:top-4">
-          <Resumo preco={preco} erro={erroPreco} parceria={parceria} />
+          <Resumo preco={preco} erro={erroPreco} parceria={parceria} tamanhos={dados.tamanhos} />
 
           <Cartao titulo="Entrega e pagamento">
             <div className="flex gap-1.5 mb-3">
@@ -412,8 +472,12 @@ function Progresso({
 }
 
 function Resumo({
-  preco, erro, parceria,
-}: { preco: Precificacao | null; erro: string | null; parceria: boolean }) {
+  preco, erro, parceria, tamanhos,
+}: {
+  preco: Precificacao | null; erro: string | null; parceria: boolean
+  /** só para escrever o tamanho na linha do Personalizado */
+  tamanhos: DadosPedido['tamanhos']
+}) {
   return (
     <Cartao titulo="Resumo" nota="calculado no servidor">
       {erro ? (
@@ -428,7 +492,10 @@ function Resumo({
         <>
           {preco.lines.filter((l) => l.unit_price_cents > 0 || l.item_type === 'plan_base')
             .map((l, i) => (
-              <Linha key={i} rotulo={`${l.qty > 1 ? `${l.qty}× ` : ''}${l.name_snapshot}`}
+              <Linha key={i} rotulo={`${l.qty > 1 ? `${l.qty}× ` : ''}${l.name_snapshot}${
+                       l.size_id
+                         ? ` (${tamanhos.find((t) => t.id === l.size_id)?.code ?? ''})`
+                         : ''}`}
                      valor={l.unit_price_cents * l.qty}
                      tom={l.item_type === 'extra' ? 'warn' : l.taxable ? undefined : 'accent'} />
             ))}

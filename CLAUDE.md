@@ -94,6 +94,19 @@ configuração tem que renderizar `ConfigMissing`, não body vazio.
 
 `vercel.json` faz o rewrite de SPA; sem ele, atualizar em `/semana` dá 404.
 
+**`ErrorBoundary` envolve cada tela e o link público.** Sem ele, UMA exceção de
+render apaga o aplicativo inteiro — o React desmonta a árvore e sobra `<body>`
+vazio, que é a tela em branco que o §8 proíbe. Os smoke tests cobrem um
+caminho (falta de configuração); o boundary cobre o resto. O `key={s.path}`
+reseta o boundary ao navegar, senão a tela quebrada continua na frente depois
+de a pessoa clicar em outro item do menu.
+
+Não há teste automático do boundary, de propósito: quebrar um componente pelo
+navegador exigiria um botão de sabotagem no bundle de produção, e testar por
+unidade exigiria DOM nos unitários, que este projeto não tem. O que existe é o
+diagnóstico em `overview.spec.ts` — quando uma tela não aparece, ele imprime o
+que estava na tela e os erros do console, em vez de "element not found".
+
 O e2e roda **serial** (`workers: 1`, `fullyParallel: false`): há um banco só,
 compartilhado por todos os specs. Um teste cria ZIP enquanto outro exige a
 lista vazia — em paralelo isso falha sem existir bug.
@@ -553,6 +566,23 @@ noutro ciclo.
 Fotos vão para o bucket `dish-photos` (migration 0800): leitura pública, porque
 o link público é sem sessão; escrita só para a equipe. O upload acontece
 **depois** de o prato ter id, para o caminho no Storage nunca colidir.
+
+## Pedido Personalizado (§5.3)
+
+O servidor sempre soube fazer — `fn_price_order` com `kind = 'custom'` cobra
+por unidade, com o preço vindo de `custom_unit_prices` e as chaves de tax e
+delivery de `settings`. O que faltava era a tela: o botão existia e não abria
+nada.
+
+**A quantidade é por PRATO E TAMANHO**, não por prato. O §5.3 cita "3 Small +
+3 Large" como caso comum, e o preço é unitário por tamanho — por isso a chave
+do contador é `prato:tamanho` aqui, e só `prato` no plano, onde o tamanho é um
+só para o pedido inteiro. Trocar de tipo zera os pratos: as chaves mudam de
+formato e o que sobrasse viraria item fantasma, invisível na tela e presente no
+que vai para o servidor.
+
+O resumo escreve o tamanho na linha. Sem isso o mesmo prato em S e em L aparece
+como duas linhas iguais com preços diferentes.
 
 ## Preço na tela de Catálogo
 

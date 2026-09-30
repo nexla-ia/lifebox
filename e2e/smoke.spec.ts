@@ -46,6 +46,22 @@ test('rota profunda não devolve 404 (rewrite de SPA)', async ({ page }) => {
   expect(await telaVisivel(page)).not.toBeNull()
 })
 
+/* §8, tela 9f: nenhuma tela pode vir em branco.
+ *
+ * O caso da configuração faltando está nos testes acima. O outro caminho para
+ * a tela branca é exceção de render: o React desmonta a árvore e sobra `<body>`
+ * vazio. Apareceu de verdade — o Overview ficou em branco ao trocar para Mês,
+ * intermitente, e a falha dizia só "element not found".
+ *
+ * NÃO existe teste automático do boundary aqui, e é melhor dizer isso do que
+ * fingir: quebrar um componente de propósito pelo navegador exigiria um botão
+ * de sabotagem no bundle de produção, e testar por unidade exigiria DOM nos
+ * testes unitários, que este projeto não tem. O que existe é o `ErrorBoundary`
+ * em `src/ui/ErrorBoundary.tsx`, envolvendo cada tela e o link público, e o
+ * diagnóstico em `overview.spec.ts`, que agora imprime o erro do console
+ * quando uma tela não aparece. Quando a tela branca voltar, ela se identifica.
+ */
+
 test('a identidade da marca chegou no bundle', async ({ page }) => {
   await page.goto('/')
   // verde-escuro da marca, token --color-brand do protótipo aprovado

@@ -158,13 +158,32 @@ test.describe('overview', () => {
   })
 
   test('a visão Mês soma as semanas, sem inventar período', async ({ page }) => {
+    // §8, tela 9f: nenhuma tela pode vir em branco. Se vier, o motivo está no
+    // console — sem isso a falha diz só "element not found".
+    const quebras: string[] = []
+    page.on('pageerror', (e) => quebras.push(`pageerror: ${e.message}`))
+    page.on('console', (m) => { if (m.type() === 'error') quebras.push(`console: ${m.text()}`) })
+
     await entrar(page)
     await page.getByRole('button', { name: 'Mês', exact: true }).click()
 
     // esperar o PERÍODO trocar antes de ler o número: entre o clique e a
     // resposta a tela mostra o mês com zero, e ler ali dava falha intermitente
     // que não era bug nenhum
-    await expect(page.getByText(/^\w+\.? de \d{4}$/)).toBeVisible({ timeout: 20_000 })
+    // Diagnóstico junto: "element not found" não diz o que a tela mostrava, e
+    // esta falha só aparece na suíte inteira — sem a pista, cada investigação
+    // custa uma rodada de três minutos.
+    const rotulo = page.getByText(/^\w+\.? de \d{4}$/)
+    const achou = await rotulo.first()
+      .waitFor({ state: 'visible', timeout: 20_000 })
+      .then(() => true, () => false)
+    if (!achou) {
+      const corpo = await page.locator('main, body').first().innerText()
+        .catch(() => '(sem corpo)')
+      throw new Error(`o período não virou mês. Tela: ${JSON.stringify(corpo.slice(0, 200))}`
+        + `
+Erros: ${quebras.slice(0, 4).join(' | ') || '(nenhum)'}`)
+    }
 
     // o mês contém a semana do pedido, então o faturamento é pelo menos o dele
     await expect(page.getByLabel('Faturamento', { exact: true }))

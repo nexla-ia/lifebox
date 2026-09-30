@@ -19,6 +19,8 @@ export type DadosPedido = {
   pratos: Dish[]
   planos: Plan[]
   precos: { plan_id: string; size_id: string; base_price_cents: number }[]
+  /** unitário do Personalizado por tamanho (§5.3) — cadastro, não constante */
+  unitarios: { size_id: string; unit_price_cents: number }[]
   tamanhos: Size[]
   addons: Addon[]
   variantes: AddonVariant[]
@@ -41,7 +43,7 @@ export async function fetchDadosPedido(weekId?: string) {
   if (eSemana) return { data: null, error: { message: eSemana.message } }
   const s = semana as Semana
 
-  const [pratos, planos, precos, tamanhos, addons, variantes, formas, clientes] =
+  const [pratos, planos, precos, unitarios, tamanhos, addons, variantes, formas, clientes] =
     await Promise.all([
       // só os pratos ativos no menu da semana (§4)
       s.menu_id
@@ -51,6 +53,7 @@ export async function fetchDadosPedido(weekId?: string) {
         : Promise.resolve({ data: [], error: null }),
       supabase.from('plans').select('*').eq('active', true).order('position'),
       supabase.from('plan_prices').select('*'),
+      supabase.from('custom_unit_prices').select('size_id, unit_price_cents'),
       supabase.from('sizes').select('*').eq('active', true).order('position'),
       supabase.from('addons').select('*').eq('active', true).order('position'),
       supabase.from('addon_variants').select('*').eq('active', true).order('position'),
@@ -58,7 +61,7 @@ export async function fetchDadosPedido(weekId?: string) {
       supabase.from('customers').select('*').order('first_name'),
     ])
 
-  const falha = [planos, precos, tamanhos, addons, variantes, formas, clientes]
+  const falha = [planos, precos, unitarios, tamanhos, addons, variantes, formas, clientes]
     .find((r) => r.error)
   if (falha?.error) return { data: null, error: { message: falha.error.message } }
 
@@ -71,6 +74,7 @@ export async function fetchDadosPedido(weekId?: string) {
         .sort((a, b) => a.name_pt.localeCompare(b.name_pt)),
       planos: (planos.data ?? []) as Plan[],
       precos: (precos.data ?? []) as DadosPedido['precos'],
+      unitarios: (unitarios.data ?? []) as DadosPedido['unitarios'],
       tamanhos: (tamanhos.data ?? []) as Size[],
       addons: (addons.data ?? []) as Addon[],
       variantes: (variantes.data ?? []) as AddonVariant[],
@@ -92,6 +96,9 @@ export type Precificacao = {
     qty: number
     unit_price_cents: number
     taxable: boolean
+    /** no Personalizado a mesma linha existe em S e em L, com preços
+     *  diferentes — sem o tamanho o resumo mostra dois "Frango grelhado" */
+    size_id?: string | null
   }[]
   taxable_cents: number
   tax_cents: number
