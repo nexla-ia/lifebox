@@ -223,6 +223,28 @@ dois.
 Ao apagar dado de teste, **apague pedidos antes do cliente**:
 `orders.customer_id` não tem `ON DELETE CASCADE` e o DELETE falha em silêncio.
 
+**Rotina de sexta (§6.4).** Pedido da semana sem pagamento aparece em "Sem
+pagamento", com **Cancelar** e **Dar mais prazo**. Duas coisas que o §6.4 não
+previa, porque é anterior a elas:
+
+- **O cancelamento é do PEDIDO** (`orders.canceled_at`), não da pessoa. O
+  status de `customer_weeks` é da pessoa, e ela pode ter dois pedidos na semana
+  — cancelar por ali mataria junto o que ela pagou. A pessoa só vira
+  `cancelamento` quando não lhe sobra pedido ativo; aí entra em `follow_up` na
+  semana seguinte, que é o que o §6.4 pede.
+- **Cancelar tem de tirar a comida da produção.** `v_production` somava
+  `order_items` sem olhar status: a equipe cancelaria na sexta e a cozinha
+  faria o prato no sábado do mesmo jeito. Vale também para a folha de montagem,
+  a matriz e `v_week_summary` — todos passaram a filtrar `canceled_at is null`.
+
+Pedido **pago** não se cancela por aqui: isso é estorno, outra conversa, com
+dinheiro de volta. A função recusa em vez de fingir que resolve.
+
+"Dar mais prazo" grava `payment_grace_until` no pedido. Silenciar só na tela
+faria o aviso voltar no próximo F5, e a equipe decidiria a mesma coisa cinco
+vezes. O prazo vai até o FIM do dia no fuso da operação, não 24h corridas —
+"mais um dia" para quem está na cozinha é até o fim de amanhã.
+
 ## Produção
 
 A Cozinha alcança só `v_production` e `v_kitchen_notes` (§3). A **matriz**

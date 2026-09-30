@@ -56,6 +56,9 @@ export async function fetchMontagem(weekId: string) {
                   sizes(code))
     `)
     .eq('week_id', weekId)
+    // pedido cancelado na sexta não vira parada: a folha é o trabalho do
+    // domingo, e ninguém monta sacola para quem foi cancelado
+    .is('canceled_at', null)
     // quem ainda não foi classificado vai para o FIM, na ordem do código:
     // parada nova não pode cair no meio de um trajeto já organizado
     .order('delivery_seq', { ascending: true, nullsFirst: false })

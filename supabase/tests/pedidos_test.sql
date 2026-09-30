@@ -207,4 +207,123 @@ begin
   raise notice 'PEDIDOS OK';
 end $t$;
 
+-- ------------------------------------------- rotina de sexta (§6.4)
+do $sexta$
+declare
+  v_u uuid := gen_random_uuid(); v_w uuid; v_prox uuid;
+  v_plan uuid; v_s uuid; v_d uuid; v_c1 uuid; v_c2 uuid;
+  r jsonb; v_o1 uuid; v_o2a uuid; v_o2b uuid;
+  v_prod_antes int; v_dinheiro_antes int;
+begin
+  insert into auth.users (id, email) values (v_u, 'sexta@teste.local');
+  update profiles set role = 'operacao', status = 'ativo' where id = v_u;
+  perform set_config('request.jwt.claim.sub', v_u::text, true);
+
+  v_w := fn_semana_atual();
+  select id into v_s    from sizes  where code = 'S';
+  select id into v_plan from plans  where name_en = 'TEST ORD';
+  select id into v_d    from dishes where name_en = 'Dish ord';
+
+  insert into customers (first_name, phone_e164, status) values
+    ('Nao Pagou','+15556660001','ativo'), ('Pagou Um So','+15556660002','ativo');
+  select id into v_c1 from customers where phone_e164 = '+15556660001';
+  select id into v_c2 from customers where phone_e164 = '+15556660002';
+
+  r := fn_create_order(jsonb_build_object('customer_id',v_c1,'week_id',v_w,'kind','plan',
+    'plan_id',v_plan,'size_id',v_s,
+    'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_d,'qty',10))));
+  v_o1 := (r->>'order_id')::uuid;
+
+  -- a pessoa com DOIS pedidos: um pago, um nao. E o caso que o §6.4 nao
+  -- previa, porque e posterior a ele.
+  r := fn_create_order(jsonb_build_object('customer_id',v_c2,'week_id',v_w,'kind','plan',
+    'plan_id',v_plan,'size_id',v_s,
+    'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_d,'qty',10))));
+  v_o2a := (r->>'order_id')::uuid;
+  update orders set payment_status = 'confirmado' where id = v_o2a;
+  r := fn_create_order(jsonb_build_object('customer_id',v_c2,'week_id',v_w,'kind','plan',
+    'plan_id',v_plan,'size_id',v_s,
+    'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_d,'qty',10))));
+  v_o2b := (r->>'order_id')::uuid;
+
+  raise notice 'a fila traz quem nao pagou, e so quem nao pagou';
+  perform assert_eq((select count(*)::int from fn_pendencias_pagamento(v_w)
+                      where order_id in (v_o1, v_o2a, v_o2b)), 2,
+                    'os dois sem pagamento; o confirmado fica fora');
+
+  raise notice 'quem ja mandou comprovante NAO entra: isso e outra fila';
+  update orders set payment_status = 'comprovante_recebido' where id = v_o1;
+  perform assert_eq((select count(*)::int from fn_pendencias_pagamento(v_w)
+                      where order_id = v_o1), 0, 'comprovante recebido sai da cobranca');
+  update orders set payment_status = 'aguardando_pagamento' where id = v_o1;
+
+  raise notice 'dar prazo silencia ate o fim do prazo, e fica GRAVADO';
+  perform fn_dar_prazo_pagamento(v_o1, 2);
+  perform assert_eq((select count(*)::int from fn_pendencias_pagamento(v_w)
+                      where order_id = v_o1), 0, 'sai da fila enquanto tem prazo');
+  perform assert_eq((select payment_grace_until > now() from orders where id = v_o1),
+                    true, 'o prazo ficou no pedido, nao so na tela');
+  -- e volta quando vence
+  update orders set payment_grace_until = now() - interval '1 hour' where id = v_o1;
+  perform assert_eq((select count(*)::int from fn_pendencias_pagamento(v_w)
+                      where order_id = v_o1), 1, 'vencido, volta a cobrar');
+
+  select coalesce(sum(qty),0)::int into v_prod_antes from v_production where week_id = v_w;
+  select pedidos_cents into v_dinheiro_antes from v_week_summary where week_id = v_w;
+
+  raise notice 'cancelar tira da producao, da montagem e do dinheiro';
+  r := fn_cancelar_sem_pagamento(v_o1);
+  perform assert_eq((r->>'cliente_cancelado')::boolean, true,
+                    'sem outro pedido, a pessoa vira Cancelamento');
+  perform assert_eq((select order_status from customer_weeks
+                      where customer_id = v_c1 and week_id = v_w),
+                    'cancelamento'::order_status, 'status da semana mudou');
+  perform assert_eq((select coalesce(sum(qty),0)::int from v_production where week_id = v_w)
+                    < v_prod_antes, true,
+                    'a comida saiu da folha da cozinha');
+  perform assert_eq((select pedidos_cents from v_week_summary where week_id = v_w)
+                    < v_dinheiro_antes, true,
+                    'e o dinheiro saiu do faturamento');
+
+  raise notice 'e o cliente entra em follow_up na semana SEGUINTE (§6.4)';
+  select id into v_prox from weeks where iso_code = r->>'follow_up_em';
+  perform assert_eq((select order_status from customer_weeks
+                      where customer_id = v_c1 and week_id = v_prox),
+                    'follow_up'::order_status, 'follow-up criado na proxima semana');
+
+  raise notice 'com DOIS pedidos, cancelar um nao cancela a pessoa';
+  -- e a diferenca que o §6.4 nao tinha como prever: o status e da PESSOA, e
+  -- ela continua tendo um pedido pago nesta semana
+  r := fn_cancelar_sem_pagamento(v_o2b);
+  perform assert_eq((r->>'cliente_cancelado')::boolean, false,
+                    'sobrou pedido ativo, a pessoa continua como estava');
+  perform assert_eq((select order_status from customer_weeks
+                      where customer_id = v_c2 and week_id = v_w) <> 'cancelamento'::order_status,
+                    true, 'o pedido pago nao foi junto');
+
+  raise notice 'pedido PAGO nao se cancela por aqui — isso e estorno';
+  begin
+    perform fn_cancelar_sem_pagamento(v_o2a);
+    raise exception 'FALHOU: cancelou pedido pago';
+  exception when sqlstate 'LB409' then raise notice '  ok  recusa cancelar pedido pago';
+  end;
+
+  raise notice 'e cancelar duas vezes nao empilha';
+  begin
+    perform fn_cancelar_sem_pagamento(v_o1);
+    raise exception 'FALHOU: cancelou de novo';
+  exception when sqlstate 'LB409' then raise notice '  ok  recusa cancelar o que ja foi';
+  end;
+
+  raise notice 'quem nao e da equipe nao cancela nem da prazo';
+  perform set_config('request.jwt.claim.sub', '', true);
+  begin
+    perform fn_cancelar_sem_pagamento(v_o2b);
+    raise exception 'FALHOU: anonimo cancelou pedido';
+  exception when sqlstate 'LB403' then raise notice '  ok  recusa quem nao e da equipe';
+  end;
+
+  raise notice 'ROTINA DE SEXTA OK';
+end $sexta$;
+
 rollback;

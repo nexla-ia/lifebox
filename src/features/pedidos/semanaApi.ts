@@ -245,6 +245,31 @@ export async function fetchDetalhePedido(
   return { data: ficha, error: null }
 }
 
+/* ------------------------------------------------- rotina de sexta (§6.4) */
+
+export type PendenciaPagamento = {
+  order_id: string
+  code: string
+  cliente: string
+  telefone: string
+  total_cents: number
+  criado_em: string
+  prazo_ate: string | null
+}
+
+/** Pedidos da semana sem pagamento — o que a sexta tem de decidir. */
+export async function fetchPendencias(weekId: string) {
+  const { data, error } = await supabase.rpc('fn_pendencias_pagamento', { p_week: weekId })
+  if (error) return { data: null, error: { message: error.message } }
+  return { data: (data ?? []) as PendenciaPagamento[], error: null }
+}
+
+export const cancelarSemPagamento = (orderId: string) =>
+  supabase.rpc('fn_cancelar_sem_pagamento', { p_order: orderId })
+
+export const darPrazoPagamento = (orderId: string) =>
+  supabase.rpc('fn_dar_prazo_pagamento', { p_order: orderId })
+
 /* ---------------------------------------------- avisos da automação (§9.2) */
 
 export type AvisoPedido = {

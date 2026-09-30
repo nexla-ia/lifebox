@@ -5,8 +5,10 @@ import { useQuery } from '../../lib/useQuery'
 import { EmptyState, ErrorState, Loading } from '../../ui/states'
 import { moneyInput, parseMoney } from '../../lib/precos'
 import {
-  fetchAvisosFalhos, fetchPainel, mudarPagamento, paraCSV, reenviarAviso, salvarMeta,
+  cancelarSemPagamento, darPrazoPagamento, fetchAvisosFalhos, fetchPendencias,
+  fetchPainel, mudarPagamento, paraCSV, reenviarAviso, salvarMeta,
   type AvisoPedido, type LinhaPedido, type PainelSemana as Dados,
+  type PendenciaPagamento,
 } from './semanaApi'
 
 /* Painel da Semana. Ref: protótipo 10a (painel) e 9a (modo planilha).
@@ -105,6 +107,7 @@ export function PainelSemana({
 
       {modo === 'painel' ? (
         <>
+          <RotinaDeSexta weekId={weekId} onMudou={reload} />
           <PrecisaDeAcao linhas={data.linhas} />
           <Quadro linhas={linhasFiltradas} onMudou={reload} onAbrir={onAbrirPedido} />
         </>
@@ -670,6 +673,98 @@ function AvisosFalhos({ weekId }: { weekId: string }) {
               className="ml-auto bg-brand hover:bg-brand-hover disabled:opacity-60 text-cream rounded-md px-2.5 py-1 text-[11.5px] font-semibold">
               {ocupado === a.order_id ? '…' : 'Reenviar'}
             </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+/** Rotina de sexta (§6.4): pedido sem pagamento, com Cancelar e Dar prazo.
+ *
+ *  Até aqui a equipe via "Aguardando pagamento · 3" e não tinha o que fazer
+ *  com a informação — decidia por fora e o sistema não registrava nada. O
+ *  documento-mestre pede exatamente estes dois botões.
+ *
+ *  Cancelar é caro e não tem desfazer nesta tela, então pergunta antes. Dar
+ *  prazo não pergunta: é o lado seguro, e errar custa ver o pedido de novo
+ *  amanhã. */
+function RotinaDeSexta({ weekId, onMudou }: { weekId: string; onMudou: () => void }) {
+  const { data, reload } = useQuery(() => fetchPendencias(weekId), [weekId])
+  const [ocupado, setOcupado] = useState<string | null>(null)
+  const [erro, setErro] = useState<string | null>(null)
+  const [aviso, setAviso] = useState<string | null>(null)
+
+  const pendencias = data ?? []
+  if (pendencias.length === 0 && !erro && !aviso) return null
+
+  async function agir(p: PendenciaPagamento, acao: 'cancelar' | 'prazo') {
+    if (acao === 'cancelar' && !window.confirm(
+      `Cancelar o pedido ${p.code} de ${p.cliente}?
+
+`
+      + 'Ele sai da produção, da montagem e do faturamento da semana, '
+      + 'e o cliente entra em Follow-up na semana seguinte.')) return
+
+    setOcupado(p.order_id)
+    setErro(null)
+    const { data: r, error } = acao === 'cancelar'
+      ? await cancelarSemPagamento(p.order_id)
+      : await darPrazoPagamento(p.order_id)
+    setOcupado(null)
+    if (error) { setErro(error.message); return }
+
+    setAviso(acao === 'cancelar'
+      ? `${p.code} cancelado. ${p.cliente} entra em Follow-up na ${
+          (r as { follow_up_em?: string })?.follow_up_em ?? 'semana seguinte'}.`
+      : `${p.code} ganhou prazo — volta a cobrar depois disso.`)
+    reload()
+    onMudou()
+  }
+
+  return (
+    <section className="bg-warn-bg border border-warn-line rounded-xl px-4 py-3.5 flex flex-col gap-2">
+      <div className="flex items-baseline gap-2 flex-wrap">
+        <h2 className="text-[13.5px] font-bold text-warn">
+          💵 Sem pagamento · {pendencias.length}
+        </h2>
+        <span className="text-[11.5px] text-ink-3">
+          cancelar da semana ou dar mais prazo
+        </span>
+      </div>
+
+      {aviso && (
+        <p className="text-[12px] text-ok bg-ok-bg border border-ok-line rounded-lg px-3 py-1.5">
+          ✅ {aviso}
+        </p>
+      )}
+      {erro && <p role="alert" className="text-[12px] text-danger">{erro}</p>}
+
+      <ul className="flex flex-col gap-1.5">
+        {pendencias.map((p) => (
+          <li key={p.order_id}
+            className="flex items-center gap-2 flex-wrap text-[12px] border-t border-warn-line/60 pt-1.5 first:border-0 first:pt-0">
+            <strong className="text-ink">{p.cliente}</strong>
+            <span className="text-ink-3">{p.code}</span>
+            <span className="text-ink-2 tnum font-semibold">{money(p.total_cents)}</span>
+            <a href={linkWhatsApp(p.telefone)} target="_blank" rel="noreferrer"
+              className="text-brand-mid hover:underline">
+              cobrar no WhatsApp ↗
+            </a>
+            <div className="ml-auto flex gap-1.5">
+              <button
+                disabled={ocupado === p.order_id}
+                onClick={() => agir(p, 'prazo')}
+                className="border border-line-strong text-ink-2 hover:bg-surface disabled:opacity-60 rounded-md px-2.5 py-1 text-[11.5px] font-semibold">
+                Dar mais prazo
+              </button>
+              <button
+                disabled={ocupado === p.order_id}
+                onClick={() => agir(p, 'cancelar')}
+                className="bg-danger hover:opacity-90 disabled:opacity-60 text-white rounded-md px-2.5 py-1 text-[11.5px] font-semibold">
+                {ocupado === p.order_id ? '…' : 'Cancelar'}
+              </button>
+            </div>
           </li>
         ))}
       </ul>

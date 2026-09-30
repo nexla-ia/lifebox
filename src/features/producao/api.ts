@@ -96,6 +96,9 @@ export async function fetchMatriz(weekId: string) {
     `)
     .eq('item_type', 'dish')
     .eq('orders.week_id', weekId)
+    // a matriz confere item a item contra a folha; deixar o cancelado aqui
+    // faria as duas não baterem, e a conferência é exatamente para isso
+    .is('orders.canceled_at', null)
 
   if (error) return { data: null, error: { message: error.message } }
 
