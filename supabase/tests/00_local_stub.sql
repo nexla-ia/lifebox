@@ -98,6 +98,21 @@ create or replace function net.http_post(
   insert into net.chamadas (url, body) values (url, body) returning id
 $fn$;
 
+-- E a tabela onde o pg_net guarda o RESULTADO. O dublê precisa dela porque a
+-- falha do webhook é assíncrona: `fn_conferir_avisos` copia daqui antes de o
+-- pg_net apagar (6 horas no Supabase). Sem isto o teste só exercitaria o
+-- caminho feliz, que é justamente o que não quebra.
+--
+-- Nasce vazia de propósito: no dublê a chamada fica "enviando" até o teste
+-- inserir o desfecho que quer testar — entregue, recusado ou timeout.
+create table if not exists net._http_response (
+  id          bigint primary key,
+  status_code int,
+  content     text,
+  error_msg   text,
+  created     timestamptz not null default now()
+);
+
 -- Storage: o Supabase fornece; aqui só o esqueleto que a migration 0800 toca.
 create schema if not exists storage;
 

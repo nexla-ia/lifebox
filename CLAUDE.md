@@ -423,6 +423,24 @@ engole o próprio erro: URL vazia desliga o aviso, URL quebrada grava
 O e2e **desliga o webhook** no `beforeAll` e devolve no `afterAll`: sem isso,
 cada rodada mandaria a automação tentar um WhatsApp para número de teste.
 
+**Webhook que falha não pode falhar em silêncio.** Medido em 30/09/2026 contra
+o Supabase, com destino pendurado: `net.http_post` devolve em **62 ms**, o
+worker estoura nos 5000 ms configurados e a fila drena — o pedido nunca cai por
+causa do n8n, como o desenho promete. O problema é o oposto: quando o envio
+falha, `fn_notificar_pedido` já retornou e já gravou `webhook_confirmacao` no
+audit **dizendo que enviou**; a falha cai em `net._http_response`, que o pg_net
+apaga em 6 horas. O cliente fica sem as instruções de pagamento e ninguém sabe.
+
+Por isso o aviso nasce PENDENTE em `webhook_avisos` e o desfecho é copiado por
+`fn_conferir_avisos` — chamada pela tela da Semana ao abrir, que cobre a janela
+de 6 horas sem instalar pg_cron. Aviso vencido sem resposta vira **falha
+explícita**, não entrega por omissão: não saber se chegou é diferente de ter
+chegado. A faixa na Semana lista os que não saíram, com botão de reenvio.
+
+**Não se faz backfill do audit_log para essa tabela.** Tentei: os dois pedidos
+reais viraram "falhou", inclusive um que já estava PAGO — a mensagem obviamente
+chegou. Alarme que a equipe não consegue resolver é pior que nenhum.
+
 ## Montagem e bags
 
 Marcar **Montado** e registrar o envio da bag são a mesma operação

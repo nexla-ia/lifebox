@@ -245,6 +245,40 @@ export async function fetchDetalhePedido(
   return { data: ficha, error: null }
 }
 
+/* ---------------------------------------------- avisos da automação (§9.2) */
+
+export type AvisoPedido = {
+  order_id: string
+  code: string
+  enviado_em: string
+  situacao: 'entregue' | 'enviando' | 'falhou'
+  erro: string | null
+}
+
+/** Os avisos que NÃO chegaram nesta semana.
+ *
+ *  Confere antes de ler: `net._http_response` some em 6 horas, e o resultado
+ *  precisa ser copiado enquanto existe. `fn_conferir_avisos` é idempotente e
+ *  só toca nos pendentes, então chamar a cada abertura da tela é barato.
+ *
+ *  A conferência é best-effort: se ela falhar, a tela ainda mostra o que já
+ *  estava registrado. Uma faixa de aviso que derruba a Semana inteira seria
+ *  pior do que a falha que ela reporta. */
+export async function fetchAvisosFalhos(weekId: string) {
+  await supabase.rpc('fn_conferir_avisos')
+  const { data, error } = await supabase
+    .from('v_avisos_semana')
+    .select('order_id, code, enviado_em, situacao, erro')
+    .eq('week_id', weekId)
+    .eq('situacao', 'falhou')
+    .order('enviado_em', { ascending: false })
+  if (error) return { data: null, error: { message: error.message } }
+  return { data: (data ?? []) as AvisoPedido[], error: null }
+}
+
+export const reenviarAviso = (orderId: string) =>
+  supabase.rpc('fn_reenviar_aviso', { p_order: orderId })
+
 export const mudarPagamento = (orderId: string, payment_status: string) =>
   supabase.from('orders').update({
     payment_status,

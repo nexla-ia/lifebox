@@ -128,4 +128,95 @@ begin
   raise notice 'TEMPLATES OK';
 end $tpl$;
 
+-- ------------------------------ o aviso que NAO saiu tem de aparecer (§9.2)
+do $aviso$
+declare
+  v_u uuid := gen_random_uuid(); v_w uuid; v_p uuid; v_s uuid; v_d uuid;
+  v_c1 uuid; v_c2 uuid; v_c3 uuid; r jsonb;
+  v_o1 uuid; v_o2 uuid; v_o3 uuid; v_r1 bigint; v_r2 bigint; v_r3 bigint;
+begin
+  insert into auth.users (id, email) values (v_u, 'aviso.cfg@teste.local');
+  update profiles set role = 'operacao', status = 'ativo' where id = v_u;
+  perform set_config('request.jwt.claim.sub', v_u::text, true);
+
+  v_w := fn_semana_atual();
+  select id into v_s from sizes where code = 'S';
+  select id into v_p from plans where active and meals_qty = 5 limit 1;
+  select md.dish_id into v_d from menu_dishes md
+   where md.menu_id = (select menu_id from weeks where id = v_w) limit 1;
+
+  insert into customers (first_name, phone_e164, status) values
+    ('Aviso Um','+15559990001','ativo'), ('Aviso Dois','+15559990002','ativo'),
+    ('Aviso Tres','+15559990003','ativo');
+  select id into v_c1 from customers where phone_e164 = '+15559990001';
+  select id into v_c2 from customers where phone_e164 = '+15559990002';
+  select id into v_c3 from customers where phone_e164 = '+15559990003';
+
+  r := fn_create_order(jsonb_build_object('customer_id',v_c1,'week_id',v_w,'kind','plan',
+    'plan_id',v_p,'size_id',v_s,
+    'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_d,'qty',5))));
+  v_o1 := (r->>'order_id')::uuid;
+  r := fn_create_order(jsonb_build_object('customer_id',v_c2,'week_id',v_w,'kind','plan',
+    'plan_id',v_p,'size_id',v_s,
+    'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_d,'qty',5))));
+  v_o2 := (r->>'order_id')::uuid;
+  r := fn_create_order(jsonb_build_object('customer_id',v_c3,'week_id',v_w,'kind','plan',
+    'plan_id',v_p,'size_id',v_s,
+    'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_d,'qty',5))));
+  v_o3 := (r->>'order_id')::uuid;
+
+  v_r1 := fn_notificar_pedido(v_o1, 'pt');
+  v_r2 := fn_notificar_pedido(v_o2, 'pt');
+  v_r3 := fn_notificar_pedido(v_o3, 'pt');
+
+  raise notice 'o aviso nasce PENDENTE, nao entregue';
+  -- e a diferenca que faltava: antes o audit dizia "enviou" e acabava ali
+  perform assert_eq((select situacao from v_avisos_semana where order_id = v_o1),
+                    'enviando', 'sem resposta ainda, esta enviando');
+
+  raise notice 'o desfecho do pg_net vira situacao na tela';
+  insert into net._http_response (id, status_code) values (v_r1, 200);
+  insert into net._http_response (id, status_code, error_msg)
+    values (v_r2, null, 'Timeout of 5000 ms reached');
+  perform assert_eq(fn_conferir_avisos() >= 2, true, 'conferiu os dois que tinham resposta');
+
+  perform assert_eq((select situacao from v_avisos_semana where order_id = v_o1),
+                    'entregue', '200 = entregue');
+  perform assert_eq((select situacao from v_avisos_semana where order_id = v_o2),
+                    'falhou', 'timeout = falhou');
+  perform assert_eq(position('Timeout' in (select erro from v_avisos_semana
+                                            where order_id = v_o2)) > 0, true,
+                    'e o motivo fica legivel para a equipe');
+
+  raise notice 'o que o pg_net apagou vira DESCONHECIDO, nao entregue';
+  -- nao saber se chegou e diferente de ter chegado: marcar como entregue por
+  -- omissao esconderia exatamente o caso que este teste existe para pegar
+  update webhook_avisos set enviado_em = now() - interval '7 hours'
+   where request_id = v_r3;
+  perform fn_conferir_avisos();
+  perform assert_eq((select situacao from v_avisos_semana where order_id = v_o3),
+                    'falhou', 'aviso sem resposta e vencido conta como falha');
+  perform assert_eq(position('expirou' in (select erro from v_avisos_semana
+                                            where order_id = v_o3)) > 0, true,
+                    'e diz que expirou, nao inventa motivo');
+
+  raise notice 'reenviar cria um aviso NOVO, sem apagar o que falhou';
+  declare v_antes int; begin
+    select count(*) into v_antes from webhook_avisos where order_id = v_o2;
+    perform fn_reenviar_aviso(v_o2);
+    perform assert_eq((select count(*)::int from webhook_avisos where order_id = v_o2),
+                      v_antes + 1, 'o historico da falha continua la');
+  end;
+
+  raise notice 'e quem nao e da equipe nao confere nem reenvia';
+  perform set_config('request.jwt.claim.sub', '', true);
+  begin
+    perform fn_reenviar_aviso(v_o2);
+    raise exception 'FALHOU: anonimo reenviou aviso';
+  exception when sqlstate 'LB403' then raise notice '  ok  recusa quem nao e da equipe';
+  end;
+
+  raise notice 'AVISOS OK';
+end $aviso$;
+
 rollback;

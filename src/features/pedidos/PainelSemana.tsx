@@ -5,8 +5,8 @@ import { useQuery } from '../../lib/useQuery'
 import { EmptyState, ErrorState, Loading } from '../../ui/states'
 import { moneyInput, parseMoney } from '../../lib/precos'
 import {
-  fetchPainel, mudarPagamento, paraCSV, salvarMeta,
-  type LinhaPedido, type PainelSemana as Dados,
+  fetchAvisosFalhos, fetchPainel, mudarPagamento, paraCSV, reenviarAviso, salvarMeta,
+  type AvisoPedido, type LinhaPedido, type PainelSemana as Dados,
 } from './semanaApi'
 
 /* Painel da Semana. Ref: protótipo 10a (painel) e 9a (modo planilha).
@@ -98,6 +98,10 @@ export function PainelSemana({
           ＋ Novo pedido
         </button>
       </div>
+
+      {/* Antes de qualquer número: mensagem que não saiu é ação pendente, e a
+          equipe não tem como descobrir sozinha — o pedido fica lá bonito. */}
+      <AvisosFalhos weekId={weekId} />
 
       {modo === 'painel' ? (
         <>
@@ -607,4 +611,68 @@ function exportar(linhas: LinhaPedido[], isoCode: string) {
   a.download = `lifebox-${isoCode}.csv`
   a.click()
   URL.revokeObjectURL(a.href)
+}
+
+/** A mensagem que a automação não conseguiu entregar (§9.2).
+ *
+ *  Existe porque o webhook é assíncrono: `fn_notificar_pedido` devolve antes de
+ *  saber o desfecho, e gravava no audit que tinha enviado. A falha caía em
+ *  `net._http_response`, que ninguém lia e que o pg_net apaga em 6 horas — o
+ *  cliente ficava sem as instruções de pagamento e só se descobria quando ele
+ *  não pagava.
+ *
+ *  Some quando não há nada: faixa permanente vira parte do cenário e para de
+ *  ser lida. */
+function AvisosFalhos({ weekId }: { weekId: string }) {
+  const { data, reload } = useQuery(() => fetchAvisosFalhos(weekId), [weekId])
+  const [ocupado, setOcupado] = useState<string | null>(null)
+  const [erro, setErro] = useState<string | null>(null)
+
+  const avisos = data ?? []
+  if (avisos.length === 0 && !erro) return null
+
+  async function reenviar(a: AvisoPedido) {
+    setOcupado(a.order_id)
+    setErro(null)
+    const { error } = await reenviarAviso(a.order_id)
+    setOcupado(null)
+    // o motivo mais comum é a URL do webhook estar vazia em Configurações, e a
+    // função diz isso — engolir deixaria o clique sem efeito
+    if (error) { setErro(error.message); return }
+    reload()
+  }
+
+  return (
+    <section className="bg-warn-bg border border-warn-line rounded-xl px-4 py-3 flex flex-col gap-2">
+      <div className="flex items-baseline gap-2 flex-wrap">
+        <strong className="text-[13px] text-warn">
+          ⚠️ {avisos.length} aviso{avisos.length === 1 ? '' : 's'} de pedido
+          não chegou{avisos.length === 1 ? '' : 'ram'} na automação
+        </strong>
+        <span className="text-[11.5px] text-ink-3">
+          o cliente pode não ter recebido as instruções de pagamento
+        </span>
+      </div>
+
+      {erro && <p role="alert" className="text-[12px] text-danger">{erro}</p>}
+
+      <ul className="flex flex-col gap-1.5">
+        {avisos.map((a) => (
+          <li key={a.order_id} className="flex items-center gap-2 flex-wrap text-[12px]">
+            <strong className="text-ink">{a.code}</strong>
+            <span className="text-ink-3">
+              {new Date(a.enviado_em).toLocaleString('pt-BR')}
+            </span>
+            {a.erro && <span className="text-ink-muted">· {a.erro}</span>}
+            <button
+              disabled={ocupado === a.order_id}
+              onClick={() => reenviar(a)}
+              className="ml-auto bg-brand hover:bg-brand-hover disabled:opacity-60 text-cream rounded-md px-2.5 py-1 text-[11.5px] font-semibold">
+              {ocupado === a.order_id ? '…' : 'Reenviar'}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
 }
