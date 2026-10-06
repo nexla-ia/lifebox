@@ -70,14 +70,32 @@ create trigger menu_dishes_posicao
   before insert on menu_dishes
   for each row execute function menu_dishes_posicao_no_fim();
 
--- quem já estava sem posição recebe uma, pela ordem do nome: é estável, e a
--- equipe reorganiza depois pela tela
+-- Renumera o MENU INTEIRO, não só as linhas sem posição.
+--
+-- A primeira versão disto numerava só os buracos, começando do 1 — e
+-- colidia com quem já tinha posição. No banco da cliente dois pratos ficaram
+-- empatados em 1, e empate é ordem que muda sozinha: a folha saía numa ordem
+-- hoje e noutra amanhã, e na tela a linha voltava para o lugar antigo depois
+-- do F5 como se o arrasto não tivesse pegado.
+--
+-- A ordem de referência é `position` primeiro e o nome como desempate: quem já
+-- estava organizado continua como estava, e quem não tinha posição entra na
+-- ordem alfabética, que ao menos é estável entre impressões.
 with ordenado as (
   select md.menu_id, md.dish_id,
-         row_number() over (partition by md.menu_id order by d.name_pt) as n
+         row_number() over (
+           partition by md.menu_id
+           order by coalesce(nullif(md.position, 0), 2147483647), d.name_pt
+         ) as n
     from menu_dishes md join dishes d on d.id = md.dish_id
-   where md.position is null or md.position = 0
 )
 update menu_dishes md set position = o.n
   from ordenado o
- where md.menu_id = o.menu_id and md.dish_id = o.dish_id;
+ where md.menu_id = o.menu_id and md.dish_id = o.dish_id
+   and md.position is distinct from o.n;
+
+-- Tentei prender isso com `unique (menu_id, position)`, inclusive deferrable.
+-- Não dá: o upsert de "ligar prato no menu" usa ON CONFLICT, e o Postgres
+-- recusa constraint deferrable como árbitro. Quem garante a unicidade daqui
+-- em diante são os dois caminhos que escrevem posição — o gatilho, que põe no
+-- fim, e `fn_ordenar_menu`, que renumera 1..N de uma vez.

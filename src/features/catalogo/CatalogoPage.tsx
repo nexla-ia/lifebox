@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../lib/auth'
 import { useQuery } from '../../lib/useQuery'
 import { ErrorState, Loading } from '../../ui/states'
@@ -16,7 +16,12 @@ type Aba = 'catalogo' | 'menus'
 
 export function CatalogoPage() {
   const { profile } = useAuth()
-  const [aba, setAba] = useState<Aba>('catalogo')
+  // Aba na URL, como no resto do sistema: recarregar no meio de um cadastro
+  // voltava para a primeira aba, e não havia como mandar "abre os menus do
+  // ciclo" para alguém.
+  const [params, setParams] = useSearchParams()
+  const aba: Aba = params.get('aba') === 'menus' ? 'menus' : 'catalogo'
+  const setAba = (v: Aba) => setParams((q) => { q.set('aba', v); return q })
   const { data, loading, error, reload } = useQuery(fetchCatalogo, [])
 
   const podeEditarPrecos = profile?.role === 'admin'

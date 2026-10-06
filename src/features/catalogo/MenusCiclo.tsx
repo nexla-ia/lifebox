@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '../../lib/useQuery'
 import { EmptyState, ErrorState, Loading } from '../../ui/states'
 import type { Dish, DishCategory, Menu } from '../../lib/types'
@@ -22,7 +23,12 @@ const CATEGORIAS: { id: DishCategory; rotulo: string }[] = [
 
 export function MenusCiclo({ podeEditar }: { podeEditar: boolean }) {
   const { data, loading, error, reload } = useQuery(fetchMenus, [])
-  const [menuAberto, setMenuAberto] = useState<string | null>(null)
+  // O menu aberto também mora na URL: sem isso, recarregar no meio de uma
+  // reorganização voltava para o menu editável e a pessoa perdia o lugar.
+  const [params, setParams] = useSearchParams()
+  const menuAberto = params.get('menu')
+  const setMenuAberto = (id: string) =>
+    setParams((q) => { q.set('aba', 'menus'); q.set('menu', id); return q })
   const [editandoPrato, setEditandoPrato] = useState<Dish | 'novo' | null>(null)
   const [confirmacao, setConfirmacao] = useState<Confirmacao | null>(null)
 
