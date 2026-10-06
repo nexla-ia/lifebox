@@ -7,6 +7,9 @@ export type ZipRow = {
   state: string
   route_id: string
   active: boolean
+  /** mínimo do pedido para entregar aqui. NULO = sem mínimo, que é diferente
+   *  de zero: zero se leria como regra já decidida (reunião de 22/09/2026) */
+  min_order_cents: number | null
 }
 
 export async function fetchZipsERotas() {
@@ -24,7 +27,18 @@ export async function fetchZipsERotas() {
 
 /** upsert em lote: reimportar uma cidade não duplica nem apaga a rota que a
  *  equipe já tinha corrigido à mão — apenas atualiza. */
-export const salvarZips = (linhas: Omit<ZipRow, 'active'>[]) =>
+/** Define (ou tira, com null) o mínimo de uma cidade inteira.
+ *
+ *  Por CIDADE porque é assim que a equipe pensa e cadastra: uma cidade rende
+ *  cinco ZIPs, e marcar um a um seria cinco cliques para uma decisão só —
+ *  bastaria esquecer um para a regra ter buraco. */
+export const salvarMinimoCidade = (cidade: string, cents: number | null) =>
+  supabase.rpc('fn_zip_minimo_cidade', { p_cidade: cidade, p_cents: cents })
+
+export const salvarMinimoZip = (zip: string, cents: number | null) =>
+  supabase.from('zip_codes').update({ min_order_cents: cents }).eq('zip', zip)
+
+export const salvarZips = (linhas: Omit<ZipRow, 'active' | 'min_order_cents'>[]) =>
   supabase.from('zip_codes').upsert(
     linhas.map((l) => ({ ...l, active: true })),
     { onConflict: 'zip' },

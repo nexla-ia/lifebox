@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '../../lib/useQuery'
 import { EmptyState, ErrorState, Loading } from '../../ui/states'
 import type { Dish, DishCategory, Menu } from '../../lib/types'
 import {
-  alternarPratoNoMenu, fetchMenus, pedidosUsandoPrato,
+  alternarPratoNoMenu, fetchMenus, ordenarMenu, pedidosUsandoPrato,
   type DadosMenus, type Semana,
 } from './menusApi'
 import { FormPrato } from './FormPrato'
@@ -146,6 +146,18 @@ export function MenusCiclo({ podeEditar }: { podeEditar: boolean }) {
           </div>
         )}
       </section>
+
+      {/* A ordem vale só para o que ESTÁ no menu — as colunas acima listam o
+          catálogo inteiro, incluindo prato que não entrou nesta rodada. */}
+      {menuId && (
+        <OrdemDoMenu
+          menuId={menuId}
+          dishes={dishes}
+          menuDishes={menuDishes}
+          podeEditar={podeEditar && !travado}
+          onSalvou={reload}
+        />
+      )}
 
       <ModalDesativar
         estado={confirmacao}
@@ -366,3 +378,109 @@ function analisarCiclo(d: DadosMenus) {
 
 const posicao = (d: DadosMenus, menuId: string) =>
   d.menus.find((m) => m.id === menuId)?.cycle_position ?? 0
+
+/** A ordem em que a cozinha conta e monta (reunião de 22/09/2026).
+ *
+ *  `menu_dishes.position` já mandava nas folhas de Produção e de Montagem —
+ *  faltava o pedaço que a equipe toca. Sem ela a ordem era a que o banco
+ *  devolvesse, que muda sozinha: duas impressões da mesma semana podiam sair
+ *  diferentes, e a conferência virava caça ao prato.
+ *
+ *  Arrastar mais as setas, como na Montagem: arrastar não funciona no toque de
+ *  boa parte dos navegadores e o teclado não alcança — são o mesmo recurso por
+ *  dois caminhos. */
+function OrdemDoMenu({
+  menuId, dishes, menuDishes, podeEditar, onSalvou,
+}: {
+  menuId: string
+  dishes: DadosMenus['dishes']
+  menuDishes: DadosMenus['menuDishes']
+  podeEditar: boolean
+  onSalvou: () => void
+}) {
+  const noMenu = useMemo(() => {
+    const ligados = menuDishes
+      .filter((md) => md.menu_id === menuId && md.active)
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+    return ligados
+      .map((md) => dishes.find((d) => d.id === md.dish_id))
+      .filter(Boolean) as DadosMenus['dishes']
+  }, [menuId, menuDishes, dishes])
+
+  const [ordem, setOrdem] = useState<string[]>(() => noMenu.map((d) => d.id))
+  const [arrastando, setArrastando] = useState<string | null>(null)
+  const [erro, setErro] = useState<string | null>(null)
+
+  useEffect(() => { setOrdem(noMenu.map((d) => d.id)) }, [noMenu])
+
+  const porId = new Map(noMenu.map((d) => [d.id, d]))
+  // a ordem local só vale quando cobre exatamente os pratos deste menu: trocar
+  // de menu troca a lista antes de o efeito rodar, e mapear a antiga daria uma
+  // lista vazia por um quadro
+  const local = ordem.length === noMenu.length
+    && noMenu.every((d) => ordem.includes(d.id))
+  const lista = local ? ordem.map((id) => porId.get(id)!) : noMenu
+
+  async function mover(de: number, para: number) {
+    if (de === para || para < 0 || para >= ordem.length) return
+    const nova = ordem.slice()
+    const [id] = nova.splice(de, 1)
+    nova.splice(para, 0, id)
+    setOrdem(nova)
+    setErro(null)
+    const { error } = await ordenarMenu(menuId, nova)
+    if (error) { setErro(error.message); return }
+    onSalvou()
+  }
+
+  if (lista.length === 0) return null
+
+  return (
+    <section className="bg-surface border border-line rounded-xl overflow-hidden">
+      <header className="px-4 py-3 border-b border-line bg-surface-alt">
+        <h2 className="text-[13.5px] font-bold text-brand">Ordem do menu</h2>
+        <p className="text-[11.5px] text-ink-muted mt-0.5">
+          É nesta sequência que a folha da cozinha conta e que a montagem fecha
+          a sacola. {podeEditar ? 'Arraste a linha ou use as setas.' : ''}
+        </p>
+      </header>
+
+      {erro && (
+        <p role="alert" className="px-4 py-2 text-[12px] text-danger">{erro}</p>
+      )}
+
+      <ol className="divide-y divide-line-soft">
+        {lista.map((d, i) => (
+          <li
+            key={d.id}
+            draggable={podeEditar}
+            onDragStart={() => setArrastando(d.id)}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={() => {
+              const de = ordem.indexOf(arrastando ?? '')
+              setArrastando(null)
+              if (de >= 0) void mover(de, i)
+            }}
+            className={`px-3.5 py-2 flex items-center gap-3 ${
+              arrastando === d.id ? 'opacity-50' : ''}`}
+          >
+            <span className="tnum text-[11.5px] font-bold text-brand w-5">{i + 1}</span>
+            <span className="flex-1 min-w-0 text-[12.5px] text-ink truncate">
+              {d.name_pt}
+            </span>
+            {podeEditar && (
+              <span className="flex flex-col">
+                <button onClick={() => void mover(i, i - 1)}
+                  aria-label={`Subir ${d.name_pt} na ordem do menu`}
+                  className="text-[9px] text-ink-muted hover:text-brand leading-none">▲</button>
+                <button onClick={() => void mover(i, i + 1)}
+                  aria-label={`Descer ${d.name_pt} na ordem do menu`}
+                  className="text-[9px] text-ink-muted hover:text-brand leading-none">▼</button>
+              </span>
+            )}
+          </li>
+        ))}
+      </ol>
+    </section>
+  )
+}

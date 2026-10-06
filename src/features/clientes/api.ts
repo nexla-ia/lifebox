@@ -138,3 +138,28 @@ export const salvarCliente = (c: ClienteParaSalvar) =>
   c.id
     ? supabase.from('customers').update(c).eq('id', c.id).select('id').single()
     : supabase.from('customers').insert(c).select('id').single()
+
+/* ------------------------------------------ quem comprava e parou (22/09) */
+
+export type ClienteSumindo = {
+  customer_id: string
+  cliente: string
+  telefone: string
+  semanas_sem_pedido: number
+  ultimo_pedido_em: string
+  ultimo_total_cents: number | null
+  pedidos_no_total: number
+}
+
+/** Clientes ativos que compravam e pararam.
+ *
+ *  `semanas` é pergunta de tela, não cadastro: a equipe muda o número para
+ *  olhar mais perto ou mais longe, e cada pessoa olha de um jeito numa segunda
+ *  de manhã. */
+export async function fetchClientesSumindo(semanas = 2) {
+  const { data, error } = await supabase.rpc('fn_clientes_sumindo', {
+    p_semanas_sem: semanas,
+  })
+  if (error) return { data: null, error: { message: error.message } }
+  return { data: (data ?? []) as ClienteSumindo[], error: null }
+}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { money } from '../../lib/supabase'
 import { formatarTelefone, normalizarTelefone } from '../../lib/telefone'
 import { apenasDigitos } from '../../lib/numero'
 import { normalizarZip } from '../../lib/zip'
@@ -45,7 +46,7 @@ export const CLIENTE_VAZIO: DadosCliente = {
 type EstadoZip =
   | { estado: 'vazio' }
   | { estado: 'conferindo' }
-  | { estado: 'atende'; city: string; rota: string }
+  | { estado: 'atende'; city: string; rota: string; minimo?: number | null }
   | { estado: 'fora' }
 
 export function PassoIdentificacao({
@@ -125,7 +126,10 @@ export function PassoIdentificacao({
     setZip({ estado: 'conferindo' })
     const { data } = await consultarZipAtendido(z)
     if (!data?.atende) { setZip({ estado: 'fora' }); return }
-    setZip({ estado: 'atende', city: data.city ?? '', rota: data.rota ?? '' })
+    setZip({
+      estado: 'atende', city: data.city ?? '', rota: data.rota ?? '',
+      minimo: data.min_order_cents ?? null,
+    })
     if (gravarCidade) setDados({ ...dados, zip_code: z, city: data.city ?? '' })
   }
 
@@ -247,6 +251,14 @@ export function PassoIdentificacao({
             <Aviso tom="ok">
               ✅ <strong>{t.entregamos}</strong>
               {zip.rota && <> · {zip.rota}</>}
+              {/* O mínimo aparece AQUI, antes de escolher prato. Descobrir no
+                  botão final que faltam $20 depois de montar o pedido inteiro
+                  é o jeito mais rápido de perder o pedido. */}
+              {zip.minimo != null && (
+                <div className="mt-1 font-semibold">
+                  {t.pedidoMinimo.replace('{valor}', money(zip.minimo))}
+                </div>
+              )}
             </Aviso>
           )}
           {!retira && zip.estado === 'fora' && (

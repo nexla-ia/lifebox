@@ -149,7 +149,11 @@ const rpc = async <T>(fn: string, args?: Record<string, unknown>) => {
 export const fetchSemanaLink = () => rpc<SemanaLink>('fn_link_semana')
 export const fetchCatalogoLink = () => rpc<CatalogoLink>('fn_link_catalogo')
 export const consultarZipAtendido = (zip: string) =>
-  rpc<{ atende: boolean; city?: string; state?: string; rota?: string }>('fn_link_zip', { p_zip: zip })
+  rpc<{
+    atende: boolean; city?: string; state?: string; rota?: string
+    /** mínimo do pedido neste ZIP, em centavos. Null = sem mínimo. */
+    min_order_cents?: number | null
+  }>('fn_link_zip', { p_zip: zip })
 export const identificar = (phone: string) =>
   rpc<Identificacao>('fn_link_identificar', { p_phone: phone })
 

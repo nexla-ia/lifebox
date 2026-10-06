@@ -377,6 +377,82 @@ begin
   raise notice 'HOSTIL OK';
 end $hostil$;
 
+-- --------------------------------- pedido minimo por ZIP (reuniao 22/09/2026)
+do $minimo$
+declare
+  v_u uuid := gen_random_uuid(); v_w uuid; v_p uuid; v_s uuid; v_d uuid;
+  v_zip text; v_cidade text; r jsonb; v_total int;
+begin
+  insert into auth.users (id, email) values (v_u, 'min.link@teste.local');
+  update profiles set role = 'operacao', status = 'ativo' where id = v_u;
+  perform set_config('request.jwt.claim.sub', v_u::text, true);
+
+  v_w := fn_semana_atual();
+  select id into v_s from sizes where code = 'S';
+  select id into v_p from plans where active and meals_qty = 5 and breakfasts_qty = 0 limit 1;
+  select md.dish_id into v_d from menu_dishes md join weeks w on w.menu_id = md.menu_id
+   where w.id = v_w limit 1;
+  select zip, city into v_zip, v_cidade from zip_codes where active order by zip limit 1;
+
+  -- quanto custa o pedido que vamos usar, para o minimo ser maior que ele sem
+  -- numero escrito aqui: o que se testa e a REGRA, nao o preco do seed
+  v_total := (fn_link_precificar(jsonb_build_object(
+    'kind','plan','plan_id',v_p,'size_id',v_s,'fulfillment','delivery',
+    'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_d,'qty',5))))
+    ->>'total_cents')::int;
+
+  raise notice 'ZIP sem minimo nao inventa regra';
+  perform assert_eq(fn_link_zip(v_zip)->>'min_order_cents', null,
+                    'nulo e diferente de zero: zero se leria como regra decidida');
+
+  raise notice 'a equipe define a CIDADE inteira de uma vez';
+  perform assert_eq(fn_zip_minimo_cidade(v_cidade, v_total + 1000) >= 1, true,
+                    'pelo menos um ZIP da cidade recebeu o minimo');
+  perform assert_eq((fn_link_zip(v_zip)->>'min_order_cents')::int, v_total + 1000,
+                    'e o link ja conta o minimo ANTES de montar o pedido');
+
+  raise notice 'pedido abaixo do minimo e recusado, com o valor na mensagem';
+  begin
+    perform fn_link_criar_pedido(jsonb_build_object(
+      'phone','+15085550166','first_name','Abaixo','zip_code',v_zip,'city',v_cidade,
+      'kind','plan','plan_id',v_p,'size_id',v_s,'fulfillment','delivery',
+      'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_d,'qty',5))));
+    raise exception 'FALHOU: fechou pedido abaixo do minimo';
+  exception when sqlstate 'LB422' then
+    perform assert_eq(position('minimo' in lower(sqlerrm)) > 0
+                   or position('mínimo' in lower(sqlerrm)) > 0, true,
+                      'a mensagem diz que e minimo');
+    raise notice '  ok  %', sqlerrm;
+  end;
+
+  raise notice 'quem RETIRA nao passa pelo minimo — nao gera viagem';
+  r := fn_link_criar_pedido(jsonb_build_object(
+    'phone','+15085550167','first_name','Retira','city',v_cidade,
+    'kind','plan','plan_id',v_p,'size_id',v_s,'fulfillment','pickup',
+    'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_d,'qty',5))));
+  perform assert_eq(r->>'code' is not null, true, 'pick-up fecha igual');
+
+  raise notice 'tirar o minimo e deixar em branco, nao zero';
+  perform fn_zip_minimo_cidade(v_cidade, null);
+  perform assert_eq(fn_link_zip(v_zip)->>'min_order_cents', null, 'voltou a nao ter');
+  -- e zero e recusado, para nao existirem dois jeitos de dizer "sem minimo"
+  begin
+    perform fn_zip_minimo_cidade(v_cidade, 0);
+    raise exception 'FALHOU: aceitou minimo zero';
+  exception when sqlstate 'LB400' then raise notice '  ok  recusa minimo zero';
+  end;
+
+  raise notice 'e quem nao e da equipe nao define minimo';
+  perform set_config('request.jwt.claim.sub', '', true);
+  begin
+    perform fn_zip_minimo_cidade(v_cidade, 5000);
+    raise exception 'FALHOU: anonimo definiu minimo';
+  exception when sqlstate 'LB403' then raise notice '  ok  recusa quem nao e da equipe';
+  end;
+
+  raise notice 'MINIMO POR ZIP OK';
+end $minimo$;
+
 -- ---------------------------------------------------- a porta e so a funcao
 -- Os dois ambientes barram o anon de formas diferentes, e as duas valem:
 -- no cluster local ele nao tem GRANT e leva 42501; no Supabase o bootstrap ja

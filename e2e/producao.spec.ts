@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { readFile } from 'node:fs/promises'
 import './env'
 import {
   criarFixturePedido, criarPedidoDireto, lerItensProducao, limparFixturePedido,
@@ -76,6 +77,32 @@ test.describe('produção', () => {
       await expect(legenda).toBeVisible()
       await expect(legenda).toContainText('Small')
       await expect(legenda).toContainText('Menu Brasileiro')
+    })
+
+  // Reunião de 22/09: a folha impressa resolve a bancada, o CSV resolve a
+  // compra — quem vai ao mercado soma por prato numa planilha.
+  test('a folha de produção exporta CSV, na mesma ordem da impressa',
+    async ({ page }) => {
+      await login(page, email!, senha!)
+      await page.goto('/producao')
+      await expect(page.getByRole('heading', { name: 'Produção da cozinha' }))
+        .toBeVisible({ timeout: 20_000 })
+
+      const baixa = page.waitForEvent('download')
+      await page.getByRole('button', { name: 'Exportar CSV' }).click()
+      const arquivo = await baixa
+
+      expect(arquivo.suggestedFilename()).toMatch(/^lifebox-producao-.*\.csv$/)
+
+      // o conteúdo, não só o clique: exportação que baixa arquivo vazio passa
+      // num teste que só espera o download
+      const caminho = await arquivo.path()
+      const texto = caminho ? await readFile(caminho, 'utf8') : ''
+      expect(texto).toContain('Menu')
+      expect(texto).toContain('Prato')
+      expect(texto).toContain('Total')
+      // BOM, senão o Excel no Windows abre a acentuação torta
+      expect(texto.charCodeAt(0)).toBe(0xfeff)
     })
 
   test('kitchen notes aparecem no topo da folha', async ({ page }) => {

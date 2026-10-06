@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useAuth } from '../../lib/auth'
+import { baixarCSV, montarCSV } from '../../lib/csv'
 import { useQuery } from '../../lib/useQuery'
 import { EmptyState, ErrorState, Loading } from '../../ui/states'
 import {
@@ -34,6 +35,30 @@ const CATEGORIAS: Record<string, string> = {
  * Aqui o verde vale para o bloco inteiro, e não sob condição: na Montagem ele
  * marca a mistura dentro de UM pedido; aqui a folha já vem separada por menu,
  * e o bloco é a própria divisão. */
+/** A folha da semana em CSV, na MESMA ordem da impressa.
+ *
+ *  Uma coluna por tamanho, mais o total: é o formato que a planilha de compra
+ *  usa. Ordem diferente entre o papel e o arquivo faria a conferência virar
+ *  caça ao prato, que é justamente o que a ordem do menu resolveu. */
+function producaoCSV(
+  grupos: ReturnType<typeof agrupar>, tamanhos: string[],
+): string {
+  const linhas: unknown[][] = []
+  for (const g of grupos) {
+    for (const i of g.itens) {
+      linhas.push([
+        CATEGORIAS[g.categoria] ?? g.categoria,
+        i.prato,
+        ...tamanhos.map((t) => i.porTamanho[t] ?? 0),
+        i.total,
+      ])
+    }
+    linhas.push([CATEGORIAS[g.categoria] ?? g.categoria, 'TOTAL',
+                 ...tamanhos.map((t) => g.totais[t] ?? 0), g.total])
+  }
+  return montarCSV(['Menu', 'Prato', ...tamanhos, 'Total'], linhas)
+}
+
 const corDoTamanho = (t: string) =>
   t === 'L' ? 'text-late-text' : 'text-ink'
 const ehBrasileiro = (categoria: string) => categoria === 'brasileiro'
@@ -107,13 +132,17 @@ export function ProducaoPage() {
       </header>
 
       {visao === 'agregada' || ehCozinha
-        ? <Agregada weekId={weekId} ehCozinha={ehCozinha} />
+        ? <Agregada weekId={weekId} ehCozinha={ehCozinha} iso={s.iso_code} />
         : <Matriz weekId={weekId} />}
     </div>
   )
 }
 
-function Agregada({ weekId, ehCozinha }: { weekId: string; ehCozinha: boolean }) {
+function Agregada({ weekId, ehCozinha, iso }: {
+  weekId: string; ehCozinha: boolean
+  /** só para nomear o arquivo exportado */
+  iso: string
+}) {
   const { data, loading, error, reload } = useQuery(() => fetchProducao(weekId), [weekId])
   // só os tamanhos que aparecem nesta semana, na ordem do catálogo
   const tamanhos = useMemo(() => {
@@ -145,7 +174,7 @@ function Agregada({ weekId, ehCozinha }: { weekId: string; ehCozinha: boolean })
 
   return (
     <>
-      <div className="flex gap-2 flex-wrap print:hidden">
+      <div className="flex gap-2 flex-wrap items-center print:hidden">
         <Chip ehCozinha={ehCozinha}>
           <strong>{totalItens} itens</strong> na semana
         </Chip>
@@ -154,6 +183,18 @@ function Agregada({ weekId, ehCozinha }: { weekId: string; ehCozinha: boolean })
             {CATEGORIAS[g.categoria] ?? g.categoria}: <strong>{g.total}</strong>
           </Chip>
         ))}
+        <div className="flex-1" />
+        {/* A folha impressa resolve a bancada; o CSV resolve a compra. Quem vai
+            ao mercado precisa somar por prato numa planilha, e até aqui copiava
+            da tela à mão. */}
+        <button
+          onClick={() => baixarCSV(`lifebox-producao-${iso}`,
+                                   producaoCSV(grupos, tamanhos))}
+          className={ehCozinha
+            ? 'border-2 border-black text-black rounded-lg px-3 py-1.5 text-[12px] font-bold'
+            : 'bg-surface border border-line-strong hover:border-brand text-ink-2 rounded-lg px-3.5 py-1.5 text-[12px] font-semibold'}>
+          Exportar CSV
+        </button>
       </div>
 
       {/* §6.8: restrições e alergias no topo da folha, antes de qualquer número */}

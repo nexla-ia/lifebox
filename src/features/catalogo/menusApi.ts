@@ -3,7 +3,11 @@ import type { Dish, DishCategory, Menu } from '../../lib/types'
 
 export type Tag = { id: string; code: string; label_pt: string; icon: string | null; position: number }
 export type Alergeno = { id: string; code: string; label_pt: string; icon: string | null }
-export type MenuDish = { menu_id: string; dish_id: string; active: boolean }
+export type MenuDish = {
+  menu_id: string; dish_id: string; active: boolean
+  /** ordem em que a cozinha conta e monta (§4, reunião de 22/09/2026) */
+  position: number | null
+}
 export type Semana = {
   id: string
   iso_code: string
@@ -31,7 +35,7 @@ export async function fetchMenus() {
     await Promise.all([
       supabase.from('menus').select('*').order('cycle_position'),
       supabase.from('dishes').select('*').order('name_pt'),
-      supabase.from('menu_dishes').select('*'),
+      supabase.from('menu_dishes').select('*').order('position'),
       supabase.from('dish_tags').select('id, code, label_pt, icon, position').eq('active', true).order('position'),
       supabase.from('dish_tag_links').select('dish_id, tag_id'),
       supabase.from('allergens').select('id, code, label_pt, icon').eq('active', true).order('label_pt'),
@@ -128,6 +132,10 @@ export async function salvarPrato(
 
   return { error: null, dishId }
 }
+
+/** Grava a ordem do menu inteiro numa chamada. Ver fn_ordenar_menu. */
+export const ordenarMenu = (menu_id: string, dish_ids: string[]) =>
+  supabase.rpc('fn_ordenar_menu', { p_menu: menu_id, p_ids: dish_ids })
 
 export const alternarPratoNoMenu = (menu_id: string, dish_id: string, active: boolean) =>
   supabase.from('menu_dishes').upsert({ menu_id, dish_id, active }, { onConflict: 'menu_id,dish_id' })

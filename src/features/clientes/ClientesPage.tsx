@@ -1,8 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '../../lib/useQuery'
-import { formatarTelefone } from '../../lib/telefone'
+import { formatarTelefone, linkWhatsApp } from '../../lib/telefone'
+import { money } from '../../lib/supabase'
 import { EmptyState, ErrorState, Loading } from '../../ui/states'
-import { fetchClientes, type Cliente, type StatusCliente } from './api'
+import {
+  fetchClientes, fetchClientesSumindo, type Cliente, type StatusCliente,
+} from './api'
 import { FormCliente } from './FormCliente'
 import { FichaCliente } from './FichaCliente'
 import { SeloLead, SeloStatus } from './selos'
@@ -98,6 +101,8 @@ export function ClientesPage() {
           ＋ Novo cliente
         </button>
       </header>
+
+      <Sumindo />
 
       <div className="flex gap-2 items-center flex-wrap">
         {FILTROS.map((f) => (
@@ -211,5 +216,72 @@ export function ClientesPage() {
         )}
       </section>
     </div>
+  )
+}
+
+/** Quem comprava e parou (reunião de 22/09/2026).
+ *
+ *  "Para a gente ver algum cliente que comprou em uma semana, mas não está
+ *  comprando mais e evitar correr o risco de perder."
+ *
+ *  Este cliente não aparecia em tela nenhuma, e por um motivo que engana: ele
+ *  não tem pendência. Não tem pedido sem pagar, não tem comprovante para
+ *  conferir — ele não tem pedido. Some sem fazer barulho.
+ *
+ *  Skip e Cancelamento ficam fora: um avisou que volta, o outro já tem o
+ *  follow-up da semana seguinte (§6.4) e apareceria duas vezes. */
+function Sumindo() {
+  const [semanas, setSemanas] = useState(2)
+  const { data } = useQuery(() => fetchClientesSumindo(semanas), [semanas])
+  const [aberto, setAberto] = useState(true)
+
+  const lista = data ?? []
+  if (lista.length === 0) return null
+
+  return (
+    <section className="bg-warn-bg border border-warn-line rounded-xl px-4 py-3">
+      <div className="flex items-baseline gap-2 flex-wrap">
+        <button onClick={() => setAberto((v) => !v)}
+          className="text-[13px] font-bold text-warn">
+          {aberto ? '▾' : '▸'} 📉 {lista.length} cliente{lista.length === 1 ? '' : 's'}
+          {' '}parou{lista.length === 1 ? '' : 'ram'} de comprar
+        </button>
+        <label className="text-[11.5px] text-ink-3 flex items-center gap-1 ml-auto">
+          sem pedir há
+          <select
+            value={semanas}
+            onChange={(e) => setSemanas(Number(e.target.value))}
+            aria-label="Semanas sem pedido"
+            className="bg-surface border border-line rounded-md px-1.5 py-0.5 text-[11.5px]">
+            {[1, 2, 3, 4, 6, 8].map((n) => (
+              <option key={n} value={n}>{n} semana{n === 1 ? '' : 's'}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {aberto && (
+        <ul className="flex flex-col gap-1 mt-2">
+          {lista.map((c) => (
+            <li key={c.customer_id}
+              className="flex items-center gap-2 flex-wrap text-[12px] border-t border-warn-line/60 pt-1.5 first:border-0 first:pt-0">
+              <strong className="text-ink">{c.cliente}</strong>
+              <span className="text-ink-3">
+                {c.semanas_sem_pedido} semana{c.semanas_sem_pedido === 1 ? '' : 's'} sem pedir
+              </span>
+              <span className="text-ink-muted">
+                · último em {new Date(c.ultimo_pedido_em).toLocaleDateString('pt-BR')}
+                {c.ultimo_total_cents != null && ` · ${money(c.ultimo_total_cents)}`}
+                {' · '}{c.pedidos_no_total} pedido{c.pedidos_no_total === 1 ? '' : 's'} no total
+              </span>
+              <a href={linkWhatsApp(c.telefone)} target="_blank" rel="noreferrer"
+                className="ml-auto text-brand-mid hover:underline">
+                chamar no WhatsApp ↗
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   )
 }

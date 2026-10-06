@@ -1,4 +1,5 @@
 import { money } from '../../lib/supabase'
+import { baixarCSV } from '../../lib/csv'
 import type { PontoSerie, Tipo } from './api'
 
 /* Overview · aba Tabela. Ref: protótipo 8b.
@@ -55,13 +56,7 @@ export function Tabela({
     const corpo = LINHAS.map((l) =>
       [l.label, ...serie.map((p) => l.valor(p).replace(/,/g, ''))].join(sep))
     const csv = [cab, ...corpo].join('\n')
-    // BOM: sem ele o Excel abre "Renovação" como "RenovaÃ§Ã£o"
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `lifebox-overview-${tipo}-${serie.at(-1)?.chave ?? ''}.csv`
-    a.click()
-    URL.revokeObjectURL(a.href)
+    baixarCSV(`lifebox-overview-${tipo}-${serie.at(-1)?.chave ?? ''}`, csv)
   }
 
   return (

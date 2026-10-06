@@ -1,8 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { apenasDecimal } from '../../lib/numero'
+import { parseMoney } from '../../lib/precos'
+import { money } from '../../lib/supabase'
 import { useQuery } from '../../lib/useQuery'
 import { consultarZip, normalizarZip, zipsDaCidade, type LocalZip } from '../../lib/zip'
 import { EmptyState, ErrorState, Loading } from '../../ui/states'
-import { alternarZip, fetchZipsERotas, removerZip, salvarZips, type Rota } from './api'
+import {
+  alternarZip, fetchZipsERotas, removerZip, salvarMinimoCidade, salvarMinimoZip,
+  salvarZips, type Rota, type ZipRow,
+} from './api'
 
 /* Configurações · ZIP codes atendidos. Ref: protótipo 9d.
  *
@@ -69,6 +75,7 @@ export function ZipCodes({ podeEditar }: { podeEditar: boolean }) {
                 <span className="bg-muted-bg border border-line text-ink-3 rounded-full px-2.5 py-0.5 text-[11px] font-semibold">
                   {nomeRota(z.route_id)}
                 </span>
+                <Minimo zip={z} podeEditar={podeEditar} onSalvou={reload} />
                 {podeEditar && (
                   <>
                     <button
@@ -106,6 +113,7 @@ function ImportarPorCidade({
   const [buscando, setBuscando] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
+  const [minimo, setMinimo] = useState('')
 
   const rota = rotaId || rotas[0]?.id || ''
   const novos = useMemo(
@@ -132,9 +140,26 @@ function ImportarPorCidade({
     const { error } = await salvarZips(
       (previa ?? []).map((p) => ({ zip: p.zip, city: p.city, state: p.state, route_id: rota })),
     )
+    if (error) { setSalvando(false); setMsg(error.message); return }
+
+    // O mínimo vem JUNTO com a importação, não depois: a decisão "esta cidade
+    // é longe" é tomada na hora de incluí-la, e marcar ZIP a ZIP depois são
+    // cinco cliques para uma decisão só — bastaria esquecer um para a regra
+    // ter buraco.
+    const cents = minimo.trim() === '' ? null : parseMoney(minimo)
+    if (minimo.trim() !== '' && (cents === null || cents <= 0)) {
+      setSalvando(false)
+      setMsg('O pedido mínimo precisa ser maior que zero — deixe em branco para não ter mínimo.')
+      return
+    }
+    if (cents !== null) {
+      const r = await salvarMinimoCidade(previa?.[0]?.city ?? cidade, cents)
+      if (r.error) { setSalvando(false); setMsg(r.error.message); return }
+    }
     setSalvando(false)
-    if (error) { setMsg(error.message); return }
-    setMsg(`${previa?.length} ZIPs de ${previa?.[0]?.city} importados.`)
+    setMsg(`${previa?.length} ZIPs de ${previa?.[0]?.city} importados${
+      cents !== null ? `, com pedido mínimo de ${money(cents)}` : ''}.`)
+    setMinimo('')
     setPrevia(null)
     setCidade('')
     onPronto()
@@ -160,6 +185,18 @@ function ImportarPorCidade({
               onKeyDown={(e) => e.key === 'Enter' && buscar()}
               placeholder="Framingham"
               className="w-full border border-line-strong rounded-lg px-3 py-2 text-[13px] bg-surface-alt outline-none focus:border-brand"
+            />
+          </label>
+          <label>
+            <span className="text-[11px] font-semibold text-ink-2">Pedido mínimo</span>
+            <input
+              aria-label="Pedido mínimo da cidade"
+              value={minimo}
+              inputMode="decimal"
+              onChange={(e) => setMinimo(apenasDecimal(e.target.value))}
+              placeholder="sem mínimo"
+              title="Em branco = esta cidade não tem pedido mínimo"
+              className="w-28 border border-line-strong rounded-lg px-3 py-2 text-[13px] bg-surface-alt outline-none focus:border-brand tnum block"
             />
           </label>
           <label>
@@ -301,5 +338,74 @@ function AdicionarUm({ rotas, onPronto }: { rotas: Rota[]; onPronto: () => void 
         </div>
       )}
     </section>
+  )
+}
+
+/** Pedido mínimo deste ZIP (reunião de 22/09/2026).
+ *
+ *  "Alguns lugares são muito longe": nem toda parada compensa a viagem. Em
+ *  branco = sem mínimo, e é diferente de zero — zero se leria como regra já
+ *  decidida, e aí ninguém sabe se o ZIP foi analisado ou esquecido.
+ *
+ *  Salva no blur e mostra o estado enquanto grava: numa lista de 55 ZIPs, sair
+ *  do campo sem retorno nenhum deixa a pessoa sem saber se pegou. */
+function Minimo({ zip, podeEditar, onSalvou }: {
+  zip: ZipRow; podeEditar: boolean; onSalvou: () => void
+}) {
+  const atual = zip.min_order_cents
+  const [texto, setTexto] = useState(atual == null ? '' : (atual / 100).toFixed(2))
+  const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+
+  // o efeito depende do ZIP ABERTO, não do valor salvo: keyar pelo valor faria
+  // o efeito zerar o que a pessoa acabou de digitar
+  useEffect(() => {
+    setTexto(zip.min_order_cents == null ? '' : (zip.min_order_cents / 100).toFixed(2))
+  }, [zip.zip, zip.min_order_cents])
+
+  if (!podeEditar) {
+    return (
+      <span className="text-[11.5px] tnum w-20 text-right text-ink-3">
+        {atual == null ? '—' : money(atual)}
+      </span>
+    )
+  }
+
+  async function salvar() {
+    const limpo = texto.trim()
+    // parseMoney já devolve CENTAVOS e devolve null no que não é número
+    const cents = limpo === '' ? null : parseMoney(limpo)
+    if (limpo !== '' && (cents === null || cents <= 0)) {
+      setErro('maior que zero, ou vazio')
+      return
+    }
+    if (cents === atual) return
+    setSalvando(true)
+    setErro(null)
+    const { error } = await salvarMinimoZip(zip.zip, cents)
+    setSalvando(false)
+    if (error) { setErro(error.message); return }
+    onSalvou()
+  }
+
+  return (
+    <span className="flex items-center gap-1">
+      <span className="text-[11px] text-ink-muted">mín. $</span>
+      <input
+        aria-label={`Pedido mínimo em ${zip.zip}`}
+        value={texto}
+        disabled={salvando}
+        inputMode="decimal"
+        placeholder="—"
+        onChange={(e) => setTexto(apenasDecimal(e.target.value))}
+        onBlur={salvar}
+        onKeyDown={(e) => { if (e.key === 'Enter') void salvar() }}
+        title={erro ?? 'em branco = sem mínimo'}
+        className={`w-16 text-right tnum text-[12px] border rounded-md px-1.5 py-0.5 outline-none ${
+          erro ? 'border-danger text-danger'
+            : salvando ? 'border-brand bg-leaf-bg'
+            : 'border-line-strong bg-surface-alt focus:border-brand'}`}
+      />
+    </span>
   )
 }

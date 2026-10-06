@@ -52,6 +52,8 @@ export const T = {
     naoEntregamosAjuda:
       'Message us on WhatsApp — we will let you know as soon as we open your area.',
     pedidoBloqueado: 'Order blocked',
+    // a viagem até lá só compensa a partir de um valor (reunião de 22/09/2026)
+    pedidoMinimo: 'Minimum order for this address: {valor}',
     verificando: 'Checking…',
 
     // tela 6m
@@ -169,6 +171,7 @@ export const T = {
     naoEntregamosAjuda:
       'Fale com a gente pelo WhatsApp — avisamos assim que abrirmos sua região.',
     pedidoBloqueado: 'Pedido bloqueado',
+    pedidoMinimo: 'Pedido mínimo para esse endereço: {valor}',
     verificando: 'Conferindo…',
 
     jaTemPedido: 'Você já tem um pedido nesta semana',

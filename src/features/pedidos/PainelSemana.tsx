@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { baixarCSV } from '../../lib/csv'
 import { money } from '../../lib/supabase'
 import { formatarTelefone, linkWhatsApp } from '../../lib/telefone'
 import { useQuery } from '../../lib/useQuery'
@@ -607,13 +608,7 @@ const PAGAMENTOS: Record<string, string> = {
 const rotuloPagamento = (s: string) => PAGAMENTOS[s] ?? s
 
 function exportar(linhas: LinhaPedido[], isoCode: string) {
-  // BOM para o Excel abrir acentuação certa
-  const blob = new Blob(['﻿' + paraCSV(linhas)], { type: 'text/csv;charset=utf-8' })
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
-  a.download = `lifebox-${isoCode}.csv`
-  a.click()
-  URL.revokeObjectURL(a.href)
+  baixarCSV(`lifebox-${isoCode}`, paraCSV(linhas))
 }
 
 /** A mensagem que a automação não conseguiu entregar (§9.2).

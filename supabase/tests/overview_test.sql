@@ -52,6 +52,12 @@ begin
   perform fn_ensure_week(date '2026-09-22');   -- W39, entrega 27/09 → setembro
   perform fn_ensure_week(date '2026-09-29');   -- W40, entrega 04/10 → outubro
 
+  -- A semana de HOJE, qualquer que seja ela. Sem isto o teste depende do
+  -- calendário: a massa ia até a W40 e, passada essa semana, nenhuma linha
+  -- continha o hoje operacional — a asserção de "período em andamento"
+  -- quebrava sozinha, sem ninguém ter mexido em nada.
+  perform fn_semana_atual();
+
   insert into menu_dishes (menu_id, dish_id, active)
     select menu_id, v_d, true from weeks where id in (w36, w37, w38)
     on conflict do nothing;
