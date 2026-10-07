@@ -10,9 +10,27 @@ antes de entrar em produção, para não começar com número errado.
 
 Ordenado por urgência.
 
+## Onde cada coisa está (07/10/2026)
+
+**Valor que a LifeBox digita na tela** — não espera nada de nós, e não precisa
+ser decidido agora: a lista de cidades (item 1), o preço do breakfast Large
+(2), o unitário do Personalizado (5) e o estoque de bags (10). O sistema roda
+com o padrão adotado até alguém abrir a tela e corrigir.
+
+**Ainda são perguntas, e não campos:** como funcionam as 5 refeições do Super
+Detox (item 3) e qual valor a equipe prefere digitar no preço do plano (4).
+Nenhum dos dois trava nada, mas também não se resolve sozinho no cadastro.
+
+**Resolvidos:** ticket médio (9) e retirada pelo link (12).
+
 ---
 
 ## 1. Lista oficial de ZIP codes atendidos ⚠️ mais urgente
+
+> **Status:** cadastro. A LifeBox preenche em Configurações › ZIP Codes, por
+> cidade. Hoje há 55 CEPs em 2 cidades — quem estiver fora delas é recusado
+> no link, então é o item que mais atrasa o uso real.
+
 
 **O que precisamos:** a lista completa dos CEPs que vocês atendem, e a rota de
 cada um (Boston, Marlborough ou South Shore).
@@ -51,6 +69,9 @@ pedido na W37.
 ---
 
 ## 2. Preço do breakfast extra no tamanho Large
+
+> **Status:** cadastro. Editável em Catálogo › Planos e preços.
+
 
 **O que precisamos:** confirmar se é **$6.26** ou **$5.15**.
 
@@ -112,6 +133,9 @@ vocês querem ver primeiro.
 
 ## 5. Preço unitário do Pedido Personalizado
 
+> **Status:** cadastro. Editável em Catálogo.
+
+
 **O que precisamos:** o valor de cada refeição avulsa, por tamanho.
 
 **Por quê:** pedidos fora da estrutura dos planos são comuns — na W37 teve
@@ -153,9 +177,9 @@ Se o Medium voltar a ser vendido, basta reativar.
 
 ---
 
-## 9. Cálculo do ticket médio
+## 9. Cálculo do ticket médio ✅ resolvido
 
-**O que precisamos:** escolher a conta.
+**Decidido em 07/10/2026:** **valor já recebido ÷ pedidos pagos.**
 
 **Por quê:** os dois materiais usam fórmulas diferentes, e dão números bem
 distintos. Na semana W38 do exemplo:
@@ -165,16 +189,22 @@ distintos. Na semana W38 do exemplo:
 | Valor total dos pedidos ÷ número de pedidos | $125.68 |
 | Valor já recebido ÷ pedidos pagos | $143.51 |
 
-**Como estamos agora:** o Overview usa **valor já recebido ÷ pedidos pagos**,
-que é a conta do documento do projeto. O card mostra a divisão embaixo do
-número ("$574.02 ÷ 4 pagos"), para não restar dúvida de qual é.
+**Como ficou:** é o que o Overview já fazia — a conta do documento do projeto.
+Nada mudou no sistema; o que mudou é que deixou de ser provisório. O card
+continua mostrando a divisão embaixo do número ("$574.02 ÷ 4 pagos"), para não
+restar dúvida de qual conta é aquela.
 
-A outra conta já sai calculada junto: se vocês preferirem, é uma linha de tela
-para trocar.
+A outra conta continua saindo de `fn_overview` como `ticket_por_pedido_cents`,
+sem consumidor. Fica lá porque tirá-la custaria reescrever a função inteira
+para apagar uma chave de JSON — e porque é ela que responde "e se fosse pela
+outra conta?" sem ninguém precisar recalcular à mão.
 
 ---
 
 ## 10. Estoque total de bags térmicas
+
+> **Status:** cadastro. Editável na tela de Bags.
+
 
 **O que precisamos:** quantas bags vocês têm no total.
 

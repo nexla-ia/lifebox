@@ -304,9 +304,11 @@ dois e nenhum fecharia. `overview_test.sql` prende isso.
 Tudo é derivado dos pedidos. O único número digitado na tela é a **meta**,
 porque é o único que ninguém consegue derivar.
 
-Ticket médio segue o `.md`: **faturado ÷ pedidos pagos**. O protótipo (8f) usa
-total ÷ pedidos e dá outro número — os dois saem de `fn_overview` com nomes
-diferentes, e o card mostra a divisão embaixo. Ver DECISOES-ABERTAS item 9.
+Ticket médio é **faturado ÷ pedidos pagos** — decidido pela LifeBox em
+07/10/2026, e já era o que o sistema fazia. O protótipo (8f) usa total ÷
+pedidos e dá outro número; esse continua saindo como `ticket_por_pedido_cents`,
+sem consumidor, porque é ele que responde "e se fosse pela outra conta?". O
+card mostra a divisão embaixo do número.
 
 O bloco de leads fica zerado até o n8n alimentar `leads` (§9.1). A tela diz
 isso: `conversao` vem **NULL**, não 0 — sem denominador não há percentual, e
