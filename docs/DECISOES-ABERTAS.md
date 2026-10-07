@@ -17,9 +17,13 @@ ser decidido agora: a lista de cidades (item 1), o preço do breakfast Large
 (2), o unitário do Personalizado (5) e o estoque de bags (10). O sistema roda
 com o padrão adotado até alguém abrir a tela e corrigir.
 
-**Ainda são perguntas, e não campos:** como funcionam as 5 refeições do Super
-Detox (item 3) e qual valor a equipe prefere digitar no preço do plano (4).
-Nenhum dos dois trava nada, mas também não se resolve sozinho no cadastro.
+**Ainda é pergunta, e não campo:** qual valor a equipe prefere digitar no
+preço do plano (item 4). Não trava nada, mas também não se resolve sozinho no
+cadastro.
+
+As 5 refeições do Super Detox (item 3) **viraram cadastro em 07/10/2026**: o
+campo existia no banco e não existia na tela, então a resposta dependia de uma
+migration. Agora é um número no formulário do adicional.
 
 **Resolvidos:** ticket médio (9) e retirada pelo link (12).
 
@@ -90,6 +94,12 @@ Para referência, os outros extras não têm conflito:
 ---
 
 ## 3. As 5 refeições do Super Detox
+
+> **Status:** cadastro. Em Catálogo › Adicionais, o campo "Refeições do menu
+> incluídas no kit". Zero = o kit não leva prato do menu; acima de zero, o
+> cliente escolhe essa quantidade de pratos da semana e eles entram na folha
+> da cozinha.
+
 
 **O que precisamos:** confirmar como funciona.
 

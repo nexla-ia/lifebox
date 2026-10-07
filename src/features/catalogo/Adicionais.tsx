@@ -235,6 +235,34 @@ function FormAdicional({
         </Chave>
       </div>
 
+      {/* O caso real é o Super Detox: o kit inclui 5 refeições, e a pergunta é
+          se elas são pratos do menu — que a cozinha precisa COZINHAR — ou algo
+          pronto, como os sucos. O documento-mestre mandou tratar como estoque
+          até alguém definir; a planilha da W37 mostrou o cliente escolhendo do
+          menu, e é o que está valendo.
+
+          O campo existia no banco e não existia na tela, então a resposta
+          dependia de uma migration. Agora é cadastro, como o resto. */}
+      <label className="flex flex-col gap-1 max-w-sm">
+        <span className="text-[11.5px] font-semibold text-ink-2">
+          Refeições do menu incluídas no kit
+        </span>
+        <input
+          aria-label="Refeições do menu incluídas no kit"
+          value={String(f.includes_meals_qty ?? 0)}
+          inputMode="numeric"
+          onChange={(e) => setF({
+            ...f, includes_meals_qty: Number(apenasDigitos(e.target.value) || 0),
+          })}
+          className="w-24 border border-line-strong rounded-lg px-3 py-2 text-[13px] bg-surface-alt outline-none focus:border-brand tnum"
+        />
+        <span className="text-[11px] text-ink-muted">
+          Zero = o kit não leva prato do menu. Acima de zero, o cliente escolhe
+          essa quantidade de pratos da semana e eles <strong>entram na folha da
+          cozinha</strong> — alguém precisa cozinhá-los.
+        </span>
+      </label>
+
       {erro && (
         <div role="alert" className="bg-danger-bg border border-danger-line text-danger rounded-lg px-3 py-2 text-[12.5px]">
           {erro}
