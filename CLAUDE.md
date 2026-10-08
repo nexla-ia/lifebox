@@ -111,6 +111,22 @@ O e2e roda **serial** (`workers: 1`, `fullyParallel: false`): há um banco só,
 compartilhado por todos os specs. Um teste cria ZIP enquanto outro exige a
 lista vazia — em paralelo isso falha sem existir bug.
 
+**Os três perfis têm login de verdade no e2e**, cada um com seu usuário:
+`E2E_EMAIL` (Administrador), `E2E_COZINHA_EMAIL` e `E2E_OPERACAO_EMAIL`. A RLS
+já estava provada em `rls_test.sql`, mas fingindo o JWT direto no banco — o que
+só o navegador exercita é o guarda de rota, o menu e o que cada perfil
+consegue editar.
+
+As duas camadas falham de formas diferentes e as duas importam: a RLS barra
+DADO, o guarda barra TELA. Guarda falhando com RLS segurando dá tela vazia, e
+a pessoa acha que o sistema quebrou; guarda segurando com RLS falhando, basta
+o navegador para passar por cima.
+
+`e2e/operacao.spec.ts` cobre o menu (tem Semana, Clientes, Catálogo, Produção,
+Montagem e Bags; não tem Overview nem Configurações), a URL de tela proibida, o
+Catálogo (ela LÊ preço — `plan_prices_staff_read` — e não tem botão de editar)
+e que as telas dela abrem com conteúdo, não vazias.
+
 `e2e/env.ts` carrega `.env.local` antes dos specs: sem isso, esquecer de
 exportar `E2E_EMAIL` faz os testes **pularem em silêncio** e a saída fica
 verde. Pelo mesmo motivo, `scripts/db.sh test` aborta com exit 1 se não

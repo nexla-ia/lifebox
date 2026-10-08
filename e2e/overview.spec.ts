@@ -162,7 +162,9 @@ test.describe('overview', () => {
     // console — sem isso a falha diz só "element not found".
     const quebras: string[] = []
     page.on('pageerror', (e) => quebras.push(`pageerror: ${e.message}`))
-    page.on('console', (m) => { if (m.type() === 'error') quebras.push(`console: ${m.text()}`) })
+    page.on('console', (m) => {
+      if (m.type() === 'error') quebras.push(`console: ${m.text().slice(0, 900)}`)
+    })
 
     await entrar(page)
     await page.getByRole('button', { name: 'Mês', exact: true }).click()
@@ -181,8 +183,7 @@ test.describe('overview', () => {
       const corpo = await page.locator('main, body').first().innerText()
         .catch(() => '(sem corpo)')
       throw new Error(`o período não virou mês. Tela: ${JSON.stringify(corpo.slice(0, 200))}`
-        + `
-Erros: ${quebras.slice(0, 4).join(' | ') || '(nenhum)'}`)
+        + `\nErros: ${quebras.slice(0, 6).join(`\n--\n`) || '(nenhum)'}`)
     }
 
     // o mês contém a semana do pedido, então o faturamento é pelo menos o dele
