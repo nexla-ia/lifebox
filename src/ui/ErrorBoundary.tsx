@@ -66,8 +66,14 @@ export class ErrorBoundary extends Component<Props, State> {
             <summary className="text-[11.5px] text-ink-muted cursor-pointer">
               detalhe técnico
             </summary>
+            {/* Com o STACK, não só a mensagem: "Cannot read properties of
+                undefined" sem o lugar não dá para investigar, e quem copia
+                isto para a Nexla copia tudo o que tem. */}
             <pre className="text-[11px] text-ink-3 whitespace-pre-wrap mt-1.5">
               {this.state.erro.message}
+              {this.state.erro.stack && `
+
+${this.state.erro.stack.slice(0, 1200)}`}
             </pre>
           </details>
         </div>

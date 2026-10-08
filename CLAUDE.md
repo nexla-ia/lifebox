@@ -345,6 +345,17 @@ iguais, ela não desenha: uma linha reta se leria como estabilidade medida.
 vazio dá "▼ 100%" em tudo, que se lê como desabamento e é só ausência de
 histórico. A opção aparece desabilitada, para a equipe ver que existe.
 
+**Early return que devolve forma diferente do caminho feliz** foi o que deixou
+o Overview em branco, de forma intermitente, por semanas. `fn_overview_leads`
+tinha um atalho para período sem semana nenhuma, e esse atalho montava oito
+chaves enquanto o caminho normal monta nove — faltava `origens`, e a tela faz
+`ov.leads.origens.length`. Qualquer mês antigo derrubava o painel inteiro; a
+troca rápida de visão só acertava a combinação mais depressa.
+
+Não dá erro no banco nem no teste de SQL: só aparece na tela de quem usa. Por
+isso `overview_test.sql` passou a comparar as CHAVES de um período cheio com as
+de um vazio, em vez dos valores.
+
 Ainda faltam do §10, e dependem de `leads` existir: bloco de Ads (o
 `fn_overview` já devolve `ads_revenue_cents`, `ads_leads` e `ads_convertidos`),
 tendência de conversão e follow-up pendente.
@@ -515,6 +526,19 @@ rota é mandar um link.
 Na folha da cozinha o prato é colorido: **Large alaranjado, Small preto**, e
 num pedido que mistura clássico com brasileiro o **brasileiro sai verde** — os
 dois vão na mesma sacola e é aí que se troca. O verde ganha do tamanho.
+
+**Ordenar recusa lixo em vez de dizer que gravou.** Medido: id de outra semana
+devolvia 0 linhas em silêncio e a tela chamava `onMudou()` como se tivesse
+gravado; id repetido (arrasto duplo) deixava a posição com o valor da última
+ocorrência, que depende da ordem em que o executor aplicou — não determinístico.
+Hoje as duas funções conferem duplicata, escopo e contagem, e levantam. Lista
+vazia continua sendo zero legítimo: não há o que gravar.
+
+**Cancelar pedido já montado deixa a bag com o cliente, e a tela diz isso.** O
+saldo está certo — a bag saiu fisicamente e cancelar pagamento não a traz de
+volta. O problema era o silêncio: a parada some da folha no mesmo instante, e a
+bag virava uma que sumiu do controle, aparecendo semanas depois faltando na
+cozinha.
 
 `orders.delivery_seq` é a ordem do trajeto, definida arrastando a linha (ou
 pelas setas, que é o mesmo recurso para o teclado e para o toque). É por

@@ -120,6 +120,20 @@ begin
                       where menu_id = v_m order by position desc limit 1),
                     v_novo, 'o recem-incluido e o ultimo');
 
+  raise notice 'ordenar menu RECUSA prato que nao esta nele';
+  -- mesma falha da entrega: 0 linhas e silencio. A folha sairia na ordem
+  -- antiga e a tela mostraria a nova ate alguem recarregar.
+  begin
+    perform fn_ordenar_menu(v_m, array[gen_random_uuid()]);
+    raise exception 'FALHOU: aceitou prato de fora do menu';
+  exception when sqlstate 'LB409' then raise notice '  ok  recusa prato de fora';
+  end;
+  begin
+    perform fn_ordenar_menu(v_m, array[v_ids[1], v_ids[1]]);
+    raise exception 'FALHOU: aceitou o mesmo prato duas vezes';
+  exception when sqlstate 'LB422' then raise notice '  ok  recusa prato repetido';
+  end;
+
   raise notice 'e quem nao e da equipe nao reordena';
   perform set_config('request.jwt.claim.sub', '', true);
   begin

@@ -285,6 +285,14 @@ begin
                     < v_dinheiro_antes, true,
                     'e o dinheiro saiu do faturamento');
 
+  raise notice 'cancelar pedido MONTADO avisa que a bag ficou com o cliente';
+  -- A bag saiu de verdade e o saldo esta certo; o que nao pode e o silencio.
+  -- A parada some da folha no mesmo instante, entao sem o aviso a bag vira uma
+  -- que sumiu do controle — e isso so aparece semanas depois na cozinha.
+  perform assert_eq((r->>'ja_montado')::boolean, false,
+                    'este pedido nao estava montado');
+  perform assert_eq((r->>'bags_com_o_cliente')::int, 0, 'entao nenhuma bag ficou');
+
   raise notice 'e o cliente entra em follow_up na semana SEGUINTE (§6.4)';
   select id into v_prox from weeks where iso_code = r->>'follow_up_em';
   perform assert_eq((select order_status from customer_weeks

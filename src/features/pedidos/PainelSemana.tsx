@@ -709,9 +709,21 @@ function RotinaDeSexta({ weekId, onMudou }: { weekId: string; onMudou: () => voi
     setOcupado(null)
     if (error) { setErro(error.message); return }
 
+    const info = r as {
+      follow_up_em?: string; ja_montado?: boolean; bags_com_o_cliente?: number
+    } | null
+
     setAviso(acao === 'cancelar'
       ? `${p.code} cancelado. ${p.cliente} entra em Follow-up na ${
-          (r as { follow_up_em?: string })?.follow_up_em ?? 'semana seguinte'}.`
+          info?.follow_up_em ?? 'semana seguinte'}.`
+        // A bag já tinha saído: cancelar pagamento não a traz de volta, e a
+        // parada some da folha de montagem no mesmo instante. Sem dizer isto
+        // aqui, a bag some do controle e só aparece semanas depois faltando
+        // na cozinha.
+        + (info?.ja_montado
+          ? ` ⚠️ A sacola já tinha sido montada — ${info.bags_com_o_cliente} bag(s)`
+            + ' continuam com o cliente e precisam ser coletadas.'
+          : '')
       : `${p.code} ganhou prazo — volta a cobrar depois disso.`)
     reload()
     onMudou()

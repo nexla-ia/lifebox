@@ -370,12 +370,16 @@ function Dashboard({
 
         <Bloco titulo="Origens · leads e convertidos"
           nota="Influenciadores entram pelo nome, cadastrados em Configurações.">
-          {ov.leads.origens.length === 0 ? (
+          {/* `?? []` não é paranoia: foi exatamente aqui que o Overview
+              quebrou. O servidor voltou a mandar sempre a chave, e mesmo assim
+              a tela não depende disso — uma lista que falta não pode derrubar
+              o painel inteiro do Administrador. */}
+          {(ov.leads.origens ?? []).length === 0 ? (
             <p className="text-[12px] text-ink-muted">
               Aparece quando houver lead com origem registrada.
             </p>
           ) : (
-            <ListaBarras itens={ov.leads.origens.map((o) => ({
+            <ListaBarras itens={(ov.leads.origens ?? []).map((o) => ({
               nome: o.nome,
               valor: o.leads,
               nota: `${o.convertidos} conv · ${o.pct?.toFixed(1).replace('.', ',') ?? '—'}%`,

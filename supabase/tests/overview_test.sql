@@ -259,6 +259,35 @@ begin
                       'e o ticket do ponto e o mesmo do card');
   end;
 
+  raise notice 'periodo SEM SEMANA devolve a mesma FORMA do periodo cheio';
+  -- Aqui morava o bug que deixava o Overview em branco: o early return de
+  -- `fn_overview_leads` montava oito chaves enquanto o caminho normal monta
+  -- nove — faltava `origens`, e a tela faz `ov.leads.origens.length`. Qualquer
+  -- mes antigo derrubava o painel do Administrador.
+  --
+  -- O teste compara as CHAVES, nao os valores: e a forma que o consumidor usa,
+  -- e e ela que o early return esqueceu.
+  declare cheio jsonb; vazio jsonb; dif text;
+  begin
+    cheio := fn_overview('week', '2026-W38');
+    vazio := fn_overview('month', '1999-01');
+
+    select coalesce(string_agg(k, ', '), '-') into dif
+      from jsonb_object_keys(cheio) k where not vazio ? k;
+    perform assert_eq(dif, '-', 'o topo tem as mesmas chaves nos dois');
+
+    select coalesce(string_agg(k, ', '), '-') into dif
+      from jsonb_object_keys(cheio->'leads') k where not (vazio->'leads') ? k;
+    perform assert_eq(dif, '-', 'e leads tambem — era aqui que faltava origens');
+
+    perform assert_eq(jsonb_typeof(vazio->'leads'->'origens'), 'array',
+                      'origens e lista vazia, nao chave ausente');
+    -- as listas que a tela percorre precisam existir mesmo sem dado nenhum
+    perform assert_eq(jsonb_typeof(vazio->'mix_planos'), 'array', 'mix_planos existe');
+    perform assert_eq(jsonb_typeof(vazio->'adicionais'), 'array', 'adicionais existe');
+    perform assert_eq(jsonb_typeof(vazio->'top_pratos'), 'array', 'top_pratos existe');
+  end;
+
   raise notice 'leads ficam em zero ate a automacao alimentar (§9.1)';
   perform assert_eq((ov38->'leads'->>'novos')::int, 0, 'nenhum lead ainda');
   perform assert_eq(ov38->'leads'->>'conversao', null,

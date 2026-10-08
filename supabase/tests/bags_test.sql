@@ -192,6 +192,29 @@ begin
                         and customer_id not in (v_a,v_b,v_c)) >= 0, true,
                     'pedido sem ordem continua existindo');
 
+  raise notice 'ordenar RECUSA lixo em vez de dizer que gravou';
+  -- Medido na caca de 08/10: id de outra semana devolvia 0 linhas em silencio,
+  -- e a tela chamava onMudou() como se tivesse gravado. Id repetido deixava
+  -- delivery_seq com o valor da ULTIMA ocorrencia — que depende da ordem em
+  -- que o executor aplicou, ou seja, nao e deterministico.
+  begin
+    perform fn_ordenar_entrega(array[gen_random_uuid()]);
+    raise exception 'FALHOU: aceitou id que nao e de pedido';
+  exception when sqlstate 'LB422' then raise notice '  ok  recusa id de fora';
+  end;
+
+  declare v_x uuid; begin
+    select id into v_x from orders where customer_id = v_a;
+    begin
+      perform fn_ordenar_entrega(array[v_x, v_x]);
+      raise exception 'FALHOU: aceitou a mesma parada duas vezes';
+    exception when sqlstate 'LB422' then raise notice '  ok  recusa parada repetida';
+    end;
+  end;
+
+  -- lista vazia continua sendo resultado legitimo: nao ha o que gravar
+  perform assert_eq(fn_ordenar_entrega('{}'::uuid[]), 0, 'lista vazia nao e erro');
+
   raise notice 'e quem nao e da equipe NAO reordena';
   perform set_config('request.jwt.claim.sub', '', true);
   begin
