@@ -191,6 +191,32 @@ export async function criarFixturePedido(marca: string) {
   }
 }
 
+/** Limpa pela MARCA, sem depender da fixture ter sido criada.
+ *
+ *  `criarFixturePedido` cria plano, preços, pratos, menu e cliente em sequência.
+ *  Se o servidor falhar no meio — e o Supabase devolve 503 de vez em quando —
+ *  a função estoura, `fx` fica null, e o `afterAll` que chama
+ *  `limparFixturePedido(marca, fx.telefone)` nem roda. O que já tinha sido
+ *  criado fica no banco da CLIENTE.
+ *
+ *  Aconteceu: dois "Plano zzt-…" sobraram no catálogo dela em 14/10/2026.
+ *  Esta função é o que o afterAll chama quando não há fixture para limpar. */
+export async function limparPorMarca(marca: string) {
+  await limparPratos(marca)
+  const r = await rest(`plans?select=id&name_pt=like.${encodeURIComponent(`%${marca}%`)}`)
+  const planos = r ? ((await r.json()) as { id: string }[]) : []
+  for (const p of planos) {
+    // preço antes do plano: as duas tabelas apontam para ele e o DELETE do
+    // plano falharia em silêncio, deixando tudo para trás
+    await rest(`extra_prices?plan_id=eq.${p.id}`,
+               { method: 'DELETE', headers: { Prefer: 'return=minimal' } })
+    await rest(`plan_prices?plan_id=eq.${p.id}`,
+               { method: 'DELETE', headers: { Prefer: 'return=minimal' } })
+  }
+  await rest(`plans?name_pt=like.${encodeURIComponent(`%${marca}%`)}`,
+             { method: 'DELETE', headers: { Prefer: 'return=minimal' } })
+}
+
 export async function limparFixturePedido(marca: string, telefone: string) {
   // ORDEM IMPORTA: orders.customer_id NÃO tem ON DELETE CASCADE, então apagar
   // o cliente antes é recusado em silêncio e tudo fica no banco da cliente.
@@ -201,9 +227,7 @@ export async function limparFixturePedido(marca: string, telefone: string) {
                { method: 'DELETE', headers: { Prefer: 'return=minimal' } })
   }
   await limparClientes([telefone])
-  await limparPratos(marca)
-  await rest(`plans?name_pt=like.${encodeURIComponent(`%${marca}%`)}`,
-             { method: 'DELETE', headers: { Prefer: 'return=minimal' } })
+  await limparPorMarca(marca)
 }
 
 /** Remove a meta da semana criada por teste. */

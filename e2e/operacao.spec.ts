@@ -1,5 +1,8 @@
 import { expect, test, type Page } from '@playwright/test'
 import './env'
+import {
+  criarFixturePedido, criarPedidoDireto, limparFixturePedido, limparPorMarca,
+} from './supabaseTest'
 
 /* Perfil Operação (§3), com login de verdade.
  *
@@ -15,7 +18,13 @@ import './env'
  *
  * §3: Operação tem Semana, Clientes, Catálogo (lê preço, edita prato e menu),
  * Produção, Montagem e Bags. NÃO tem Overview nem Configurações, e não edita
- * preço, metas nem mensagens. */
+ * preço, metas nem mensagens.
+ *
+ * E não basta a tela ABRIR: toda ação de escrita deste sistema era testada só
+ * como Administrador. A RLS barra UPDATE devolvendo ZERO LINHAS, sem erro —
+ * uma policy errada deixaria a Operação clicar em "Montado" e nada acontecer,
+ * sem mensagem nenhuma. É o modo de falha que este projeto mais pagou caro,
+ * então os testes abaixo CONFEREM O EFEITO, não o clique. */
 
 const email = process.env.E2E_OPERACAO_EMAIL
 const senha = process.env.E2E_OPERACAO_SENHA
@@ -73,7 +82,12 @@ test.describe('perfil Operação', () => {
         const corpo = await page.locator('main').innerText()
         expect(corpo, `${rota} não pode mostrar conteúdo para a Operação`)
           .not.toMatch(/Faturamento|Ticket médio|Cutoff/)
-        expect(quebras, `${rota} quebrou no console`).toEqual([])
+        // Erro de REDE aqui é esperado: a tela é negada, e a negação costuma
+        // vir de uma requisição recusada. O que não pode é a tela QUEBRAR —
+        // TypeError é render estourando, e foi exatamente isso que deixou o
+        // Overview em branco por semanas.
+        const quebrou = quebras.filter((q) => /TypeError|ReferenceError/.test(q))
+        expect(quebrou, `${rota} quebrou o render`).toEqual([])
       }
     })
 
@@ -122,5 +136,113 @@ test.describe('perfil Operação', () => {
       const corpo = (await page.locator('main').innerText()).trim()
       expect(corpo.length, `${rota} abriu vazia para a Operação`).toBeGreaterThan(40)
     }
+  })
+})
+
+/* ---------------------------------------------------------------------------
+ * As ações do dia dela, com efeito conferido.
+ *
+ * Fixture própria, marcada e limpa no afterAll: o banco é o da cliente, e a
+ * regra da casa é apagar só o que o teste criou.
+ */
+test.describe('perfil Operação · as ações do dia', () => {
+  test.skip(!email || !senha, 'defina E2E_OPERACAO_EMAIL e E2E_OPERACAO_SENHA para rodar')
+  test.describe.configure({ mode: 'serial' })
+
+  const marca = `zzt-${Date.now().toString(36)}`
+  let fx: Awaited<ReturnType<typeof criarFixturePedido>> = null
+
+  test.beforeAll(async () => {
+    fx = await criarFixturePedido(marca)
+    if (fx) await criarPedidoDireto(fx, 10, 5)
+  })
+
+  // hook, não try/finally: teste que estoura o timeout aborta o corpo e o
+  // finally não roda, deixando lixo no banco da cliente
+  // Limpa MESMO se a fixture morreu no meio: a criação são seis chamadas em
+  // sequência, e o Supabase devolve 503 de vez em quando. Sem isto o que já
+  // tinha sido criado fica no catálogo da cliente — aconteceu.
+  test.afterAll(async () => {
+    if (fx) await limparFixturePedido(marca, fx.telefone)
+    else await limparPorMarca(marca)
+  })
+
+  const cartao = (page: Page) =>
+    page.locator('section').filter({ hasText: 'Quadro por pagamento' })
+      .getByRole('listitem').filter({ hasText: `Cliente ${marca}` })
+
+  test('avança o pagamento pelo quadro, e o estado MUDA', async ({ page }) => {
+    await entrar(page)
+    await page.goto('/semana')
+    await expect(cartao(page)).toBeVisible({ timeout: 20_000 })
+
+    // o botão some e vira o próximo passo: é o efeito, não o clique
+    await cartao(page).getByRole('button', { name: /Comprovante recebido/ }).click()
+    await expect(cartao(page).getByRole('button', { name: /Confirmado/ }))
+      .toBeVisible({ timeout: 20_000 })
+
+    // e sobrevive ao F5 — gravou no banco, não só na tela
+    await page.reload()
+    await expect(cartao(page).getByRole('button', { name: /Confirmado/ }))
+      .toBeVisible({ timeout: 20_000 })
+  })
+
+  test('marca Montado na folha, e a bag sai do estoque', async ({ page }) => {
+    await entrar(page)
+    await page.goto('/montagem')
+    await expect(page.getByRole('heading', { name: 'Montagem de domingo' }))
+      .toBeVisible({ timeout: 20_000 })
+
+    // a parada pode estar em qualquer aba de rota: o cliente de teste não tem
+    // rota, e "Sem rota" não fica numa posição fixa
+    const abas = page.getByRole('button', { name: /parada/ })
+    await expect(abas.first()).toBeVisible({ timeout: 20_000 })
+    const linha = page.getByRole('row').filter({ hasText: `Cliente ${marca}` })
+
+    let achou = false
+    for (let i = 0; i < (await abas.count()); i++) {
+      await abas.nth(i).click()
+      achou = await linha.first().waitFor({ state: 'visible', timeout: 3_000 })
+        .then(() => true, () => false)
+      if (achou) break
+    }
+    expect(achou, 'a parada do teste não apareceu em nenhuma rota').toBe(true)
+
+    // `exact` porque "Marcar X como montado" está inteiro dentro de
+    // "Desmarcar X como montado" — a armadilha de substring já paga aqui
+    await linha.getByRole('button',
+      { name: `Marcar Cliente ${marca} como montado`, exact: true }).click()
+    await expect(linha.getByRole('button',
+      { name: `Desmarcar Cliente ${marca} como montado`, exact: true }))
+      .toBeVisible({ timeout: 20_000 })
+
+    // §6.7: montar REGISTRA o envio da bag. Se a RLS barrasse a escrita em
+    // silêncio, o check viraria sozinho e o saldo não mexeria — que é
+    // exatamente o erro que só aparece semanas depois, faltando bag.
+    await page.goto('/bags')
+    await expect(page.getByText(new RegExp(`Cliente ${marca}`)).first())
+      .toBeVisible({ timeout: 20_000 })
+  })
+
+  test('liga e desliga prato no menu, que é edição dela', async ({ page }) => {
+    await entrar(page)
+    await page.goto('/catalogo?aba=menus')
+    await expect(page.getByRole('heading', { name: 'Ordem do menu' }))
+      .toBeVisible({ timeout: 20_000 })
+
+    // reordenar é escrita, e passa por `is_staff()` — a Operação é staff
+    const painel = page.locator('section').filter({ hasText: 'Ordem do menu' })
+    const linhas = painel.getByRole('listitem')
+    const antes = (await linhas.first().innerText()).trim()
+    const nome = antes.replace(/^\d+\s*/, '').replace(/[▲▼\s]+$/, '').trim()
+
+    const gravou = page.waitForResponse(
+      (r) => r.url().includes('fn_ordenar_menu') && r.status() < 400)
+    await painel.getByRole('button', { name: `Descer ${nome} na ordem do menu` }).click()
+    await gravou
+
+    await page.reload()
+    await expect(painel.getByRole('listitem').first())
+      .not.toHaveText(antes, { timeout: 20_000 })
   })
 })
