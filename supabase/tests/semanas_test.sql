@@ -88,7 +88,7 @@ end $t$;
 do $ordem$
 declare
   v_u uuid := gen_random_uuid(); v_m uuid; v_ids uuid[]; v_n int;
-  v_novo uuid;
+  v_novo uuid; v_ativos uuid[];
 begin
   insert into auth.users (id, email) values (v_u, 'menu.ord@teste.local');
   update profiles set role = 'operacao', status = 'ativo' where id = v_u;
@@ -133,6 +133,35 @@ begin
     raise exception 'FALHOU: aceitou o mesmo prato duas vezes';
   exception when sqlstate 'LB422' then raise notice '  ok  recusa prato repetido';
   end;
+
+  -- A TELA MANDA SO OS ATIVOS: a lista de Ordem do menu mostra o que esta
+  -- ligado, porque e o que a semana vai ter. Os testes acima mandam o menu
+  -- INTEIRO, que e uma chamada que a tela nunca faz — e foi por isso que o
+  -- empate passou. Numerar 1..N so o que chegou deixava o prato desligado com
+  -- a posicao velha dentro da faixa, e ao ser religado ele empatava com um
+  -- ativo. Empate e ordem que muda sozinha: a folha da cozinha sai numa
+  -- sequencia hoje e noutra amanha.
+  raise notice 'ordenar SO OS ATIVOS nao deixa empate com os desligados';
+  update menu_dishes set active = false
+   where menu_id = v_m and dish_id = v_ids[2];
+
+  select array_agg(dish_id order by position) into v_ativos
+    from menu_dishes where menu_id = v_m and active;
+  perform fn_ordenar_menu(v_m, v_ativos);
+
+  -- liga de volta, que e o ciclo normal dos 4 menus (§4). O upsert de ligar
+  -- nao mexe em position, entao o que vale e a posicao que ficou gravada.
+  update menu_dishes set active = true
+   where menu_id = v_m and dish_id = v_ids[2];
+
+  perform assert_eq((select count(*)::int from (
+                       select position from menu_dishes where menu_id = v_m
+                        group by position having count(*) > 1) e),
+                    0, 'nenhuma posicao com dois pratos');
+  -- e a ordem que a equipe pediu continua valendo para os ativos
+  perform assert_eq((select dish_id from menu_dishes
+                      where menu_id = v_m and active order by position limit 1),
+                    v_ativos[1], 'o primeiro ativo segue sendo o primeiro');
 
   raise notice 'e quem nao e da equipe nao reordena';
   perform set_config('request.jwt.claim.sub', '', true);

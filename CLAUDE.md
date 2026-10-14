@@ -572,6 +572,15 @@ Na folha da cozinha o prato é colorido: **Large alaranjado, Small preto**, e
 num pedido que mistura clássico com brasileiro o **brasileiro sai verde** — os
 dois vão na mesma sacola e é aí que se troca. O verde ganha do tamanho.
 
+**Ordenar o menu numera o menu INTEIRO, não só a lista recebida.** A tela
+manda apenas os pratos ligados — é o que a equipe organiza. Numerar 1..N só
+esses deixava o prato desligado com a posição velha dentro da faixa, e religá-lo
+no ciclo seguinte (§4) devolvia o empate que a migration de 06/10 tinha
+acabado: dois pratos na mesma posição, folha saindo numa ordem hoje e noutra
+amanhã. `fn_ordenar_menu` empurra o resto do menu para o fim. Teste que manda o
+menu inteiro não pega isso — o de `semanas_test.sql` manda só os ativos, que é
+a chamada que a tela faz.
+
 **Ordenar recusa lixo em vez de dizer que gravou.** Medido: id de outra semana
 devolvia 0 linhas em silêncio e a tela chamava `onMudou()` como se tivesse
 gravado; id repetido (arrasto duplo) deixava a posição com o valor da última

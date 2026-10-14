@@ -404,6 +404,10 @@ function OrdemDoMenu({
   podeEditar: boolean
   onSalvou: () => void
 }) {
+  // Só os pratos LIGADOS: é o que a equipe organiza, porque é o que a semana
+  // vai ter. Mandar só esses ids para `fn_ordenar_menu` é correto — a função
+  // põe a lista em 1..N e empurra o resto do menu para o fim, justamente para
+  // não sobrar prato desligado com posição dentro da faixa (14/10/2026).
   const noMenu = useMemo(() => {
     const ligados = menuDishes
       .filter((md) => md.menu_id === menuId && md.active)
