@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import './env'
 import {
   criarFixturePedido, criarPedidoDireto, lerItensProducao, limparFixturePedido,
+  nomesDeClientes,
 } from './supabaseTest'
 
 /** Produção da cozinha. Ref: protótipo 3a, 3b, 3c, 3d.
@@ -161,6 +162,39 @@ test.describe('produção', () => {
       await login(page, emailCozinha!, senhaCozinha!)
       await expect(page.getByRole('button', { name: 'matriz' })).toHaveCount(0)
     })
+
+    /* A Cozinha NÃO ESCREVE em lugar nenhum — não há policy de escrita para ela
+     * em nenhuma tabela. Então "testar o que ela faz" é curto: ela lê e
+     * imprime. O que mudou desde que estes testes foram escritos é o botão de
+     * exportar, e exportação é um caminho NOVO por onde dado sai do sistema.
+     *
+     * O §3 diz o que ela não pode ver: valor, contato e endereço. A folha na
+     * tela já respeita isso; o arquivo precisa respeitar igual, senão a regra
+     * vale para quem olha e não vale para quem baixa. */
+    test('exporta a folha, e o arquivo não leva preço nem cliente',
+      async ({ page }) => {
+        await login(page, emailCozinha!, senhaCozinha!)
+        await expect(page.getByText('PRODUÇÃO')).toBeVisible({ timeout: 20_000 })
+
+        const baixa = page.waitForEvent('download')
+        await page.getByRole('button', { name: 'Exportar CSV' }).click()
+        const caminho = await (await baixa).path()
+        const texto = caminho ? await readFile(caminho, 'utf8') : ''
+
+        // o conteúdo que ela PRECISA
+        expect(texto).toContain('Prato')
+        expect(texto).toContain('Total')
+
+        // e o que ela não pode levar: nenhum valor em dinheiro e nenhum nome
+        // de cliente. A matriz é que tem cliente, e a Cozinha nem a enxerga —
+        // mas o arquivo sai da mesma tela, então vale confirmar no arquivo.
+        expect(texto, 'a Cozinha não pode exportar preço').not.toMatch(/\$\d/)
+        const clientes = await nomesDeClientes()
+        for (const nome of clientes) {
+          expect(texto, `o arquivo não pode levar o cliente ${nome}`)
+            .not.toContain(nome)
+        }
+      })
 
     test('URL de outra tela devolve acesso negado, não os dados', async ({ page }) => {
       await login(page, emailCozinha!, senhaCozinha!)

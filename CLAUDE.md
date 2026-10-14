@@ -158,6 +158,20 @@ Montagem e Bags; não tem Overview nem Configurações), a URL de tela proibida,
 Catálogo (ela LÊ preço — `plan_prices_staff_read` — e não tem botão de editar)
 e que as telas dela abrem com conteúdo, não vazias.
 
+**Abrir a tela não é trabalhar nela.** Toda ação de escrita era exercitada só
+como Administrador, e a armadilha desta casa é RLS barrando UPDATE com zero
+linhas e sem erro — uma policy errada deixaria a Operação clicar em "Montado" e
+nada acontecer, calada. Por isso os testes de ação conferem o EFEITO: o estado
+muda, sobrevive ao F5, e a bag sai do estoque.
+
+**A Cozinha não escreve em lugar nenhum** — não há policy de escrita para ela em
+tabela alguma. Testar "o que ela faz" é curto de propósito: ela lê e imprime. O
+que mereceu teste novo foi a **exportação**, que é caminho por onde dado SAI: o
+§3 diz que ela não vê valor, contato nem endereço, e isso tem de valer para o
+arquivo também, senão a regra vale para quem olha e não vale para quem baixa.
+O teste compara o CSV com os nomes de cliente que existem no banco naquele
+momento, em vez de um nome inventado.
+
 `e2e/env.ts` carrega `.env.local` antes dos specs: sem isso, esquecer de
 exportar `E2E_EMAIL` faz os testes **pularem em silêncio** e a saída fica
 verde. Pelo mesmo motivo, `scripts/db.sh test` aborta com exit 1 se não

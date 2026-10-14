@@ -483,3 +483,17 @@ export async function limparTentativas() {
     body: '{}',
   })
 }
+
+/** Os nomes de cliente que existem hoje no banco.
+ *
+ *  Serve para provar que um arquivo exportado NÃO os contém. Ler do banco em
+ *  vez de inventar um nome: o que importa é que nenhum cliente REAL vaze, e a
+ *  lista muda conforme a LifeBox cadastra. */
+export async function nomesDeClientes(): Promise<string[]> {
+  const r = await rest('customers?select=first_name,last_name')
+  if (!r) return []
+  const linhas = (await r.json()) as { first_name: string; last_name: string | null }[]
+  return linhas
+    .map((c) => `${c.first_name} ${c.last_name ?? ''}`.trim())
+    .filter((n) => n.length > 2)
+}
