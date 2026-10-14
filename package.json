@@ -14,7 +14,8 @@
     "db:down": "bash scripts/db.sh down",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "e2e": "playwright test",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:dump": "bash scripts/db.sh dump"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",

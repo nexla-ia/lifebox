@@ -82,6 +82,37 @@ npm run db:down
 Para rodar contra o Supabase: `export DATABASE_URL=...` e use `db:reset` /
 `db:test` (o stub do schema `auth` é pulado sozinho).
 
+## Cópia de segurança
+
+```bash
+npm run db:dump     # com DATABASE_URL apontando para o Supabase
+```
+
+O schema volta das migrations em minutos. **O que não volta de lugar nenhum é o
+que a LifeBox cadastrou à mão**: os ZIPs, as configurações, os clientes e os
+pedidos. Por isso o dump existe — e por isso ele recusa rodar contra o cluster
+local, que é descartável por definição.
+
+Vai para `.private/backups/`, que o `.gitignore` já cobre: é dado real de
+cliente (§12). Formato `custom`, que restaura **por tabela** — é o que se quer
+quando alguém apagou UMA coisa, não o banco inteiro. `--no-owner --no-acl`
+porque o dump precisa restaurar num projeto NOVO, onde os roles do Supabase têm
+outros oids; sem isso o restore falha em cada GRANT, e a pessoa descobre no
+pior momento possível.
+
+**Dump que não restaura é pior que nenhum**, porque dá falsa segurança. O
+comando confere o índice do arquivo com `pg_restore -l` e apaga o arquivo se
+ele sair ilegível. A restauração foi conferida de verdade em 14/10/2026, num
+banco limpo: voltaram 3 pedidos, 3 clientes, 55 ZIPs, 21 pratos, 8 usuários e
+75 funções. O único erro foi `schema public already exists`, que o Postgres já
+criou — é esperado.
+
+**O projeto pausa sozinho.** Plano gratuito do Supabase pausa por inatividade,
+e já aconteceu três vezes em três semanas (22/09, 06/10, 14/10). Enquanto
+pausado o DNS do projeto não resolve, o link público da cliente não responde e
+ninguém é avisado. Não é bug do sistema; é decisão de plano que precisa ser
+tomada antes de a operação depender disso.
+
 ## Testes de navegador
 
 `npm run e2e` (Playwright) sobe o build e checa no Chromium de verdade.

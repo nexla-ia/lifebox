@@ -5,6 +5,7 @@
 #   scripts/db.sh reset   recria o banco: stub + migrations + seed base + exemplo
 #   scripts/db.sh test    roda os testes de preço, classificação e RLS
 #   scripts/db.sh down    derruba o cluster
+#   scripts/db.sh dump    copia de segurança do banco apontado por DATABASE_URL
 #
 # Usa um cluster Postgres próprio, isolado, com auth trust — não encosta em
 # nenhum banco existente da máquina. Para rodar contra o Supabase, exporte
@@ -19,6 +20,9 @@ PGDATA_DIR="${LIFEBOX_PGDATA:-${TMPDIR:-/tmp}/lifebox-pgdata}"
 PORT="${LIFEBOX_PGPORT:-5440}"
 LOCAL_URL="postgresql://postgres@localhost:$PORT/lifebox"
 DB_URL="${DATABASE_URL:-$LOCAL_URL}"
+# fora do repositório: o dump leva dado real de cliente, e `.private/` já é o
+# lugar que o projeto reserva para isso (§12)
+DESTINO="${LIFEBOX_BACKUP_DIR:-.private/backups}"
 IS_LOCAL=$([ "$DB_URL" = "$LOCAL_URL" ] && echo 1 || echo 0)
 
 export PGCLIENTENCODING=UTF8
@@ -70,8 +74,45 @@ case "${1:-}" in
     done
     ;;
 
+  dump)
+    # A cópia de segurança que não existia. O banco da cliente já tem pedido,
+    # cliente e os ZIPs que ela cadastrou à mão — o schema eu recrio das
+    # migrations em minutos, mas isso não volta de lugar nenhum.
+    #
+    # Formato `custom` (-Fc): comprimido e restaurável por tabela, que é o que
+    # se quer quando alguém apaga UMA coisa. SQL puro só serve para restaurar
+    # tudo ou ler com os olhos.
+    if [ "$IS_LOCAL" = 1 ]; then
+      echo "ERRO: dump é para o banco de verdade. Exporte DATABASE_URL." >&2
+      exit 1
+    fi
+    mkdir -p "$DESTINO"
+    ARQ="$DESTINO/lifebox-$(date +%Y%m%d-%H%M%S).dump"
+
+    # --no-owner e --no-acl: o dump tem de restaurar num projeto NOVO, onde os
+    # roles do Supabase têm outros oids. Sem isso o restore falha em cada
+    # GRANT e a pessoa descobre no pior momento possível.
+    pg_dump "$DB_URL" -Fc --no-owner --no-acl       --schema=public --schema=auth       --exclude-table-data='auth.audit_log_entries'       --exclude-table-data='auth.refresh_tokens'       -f "$ARQ"
+
+    # Restauração conferida de verdade em 14/10/2026, num banco limpo: voltaram
+    # os 3 pedidos, 3 clientes, 55 ZIPs, 21 pratos, 8 usuários e 75 funções.
+    # O único erro foi "schema public already exists", que o Postgres já criou.
+    #
+    # Um dump que não restaura é pior que nenhum, porque dá falsa segurança.
+    # `pg_restore -l` lê o índice do arquivo: se ele estiver truncado ou
+    # corrompido, falha aqui e não daqui a três meses.
+    if ! pg_restore -l "$ARQ" >/dev/null 2>&1; then
+      echo "ERRO: o dump saiu ilegível — NÃO conte com ele." >&2
+      rm -f "$ARQ"; exit 1
+    fi
+
+    echo "cópia em $ARQ ($(du -h "$ARQ" | cut -f1), $(pg_restore -l "$ARQ" | grep -c '^[0-9]') objetos)"
+    echo "restaurar:  pg_restore -d \"\$DATABASE_URL\" --no-owner --no-acl --clean --if-exists \"$ARQ\""
+    echo "  (um erro \"schema public already exists\" é esperado e inofensivo)"
+    ;;
+
   *)
-    sed -n '3,12p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '3,13p' "$0" | sed 's/^# \{0,1\}//'
     exit 1
     ;;
 esac
