@@ -31,7 +31,7 @@ export function FichaCliente({
   return (
     <div className="flex flex-col gap-4">
       <header className="flex items-center gap-3 flex-wrap">
-        <button onClick={onVoltar} className="text-[12.5px] text-brand-mid hover:underline">
+        <button onClick={onVoltar} className="text-[12.5px] text-brand-mid hover:underline acao-toque">
           ‹ Clientes
         </button>
         <div className="w-10 h-10 rounded-full bg-brand-mid text-cream grid place-items-center text-sm font-semibold">

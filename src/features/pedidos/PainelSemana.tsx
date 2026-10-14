@@ -230,7 +230,7 @@ function EditarMeta({
   if (!editando) {
     return (
       <button onClick={() => setEditando(true)}
-        className="text-[10.5px] text-lime hover:underline mt-1">
+        className="text-[10.5px] text-lime hover:underline acao-toque mt-1">
         {atual ? 'editar meta' : 'definir meta'}
       </button>
     )
@@ -423,7 +423,7 @@ function Telefone({ e164 }: { e164: string }) {
         target="_blank"
         rel="noreferrer"
         title="Abrir a conversa no WhatsApp"
-        className="text-[11px] text-brand-mid hover:underline tnum"
+        className="text-[11px] text-brand-mid hover:underline acao-toque tnum"
       >
         {formatarTelefone(e164)}
       </a>
@@ -755,7 +755,7 @@ function RotinaDeSexta({ weekId, onMudou }: { weekId: string; onMudou: () => voi
             <span className="text-ink-3">{p.code}</span>
             <span className="text-ink-2 tnum font-semibold">{money(p.total_cents)}</span>
             <a href={linkWhatsApp(p.telefone)} target="_blank" rel="noreferrer"
-              className="text-brand-mid hover:underline">
+              className="text-brand-mid hover:underline acao-toque">
               cobrar no WhatsApp ↗
             </a>
             <div className="ml-auto flex gap-1.5">

@@ -401,7 +401,7 @@ function Dashboard({
             </span>
             {ov.parcerias.qtd > 0 && (
               <button onClick={() => onDrill('parceria')}
-                className="text-[11.5px] text-brand-mid hover:underline ml-auto">
+                className="text-[11.5px] text-brand-mid hover:underline acao-toque ml-auto">
                 ver
               </button>
             )}

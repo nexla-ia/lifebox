@@ -109,9 +109,9 @@ export function FormasPagamento({ podeEditar }: { podeEditar: boolean }) {
                     {podeEditar && (
                       <div className="flex gap-2 items-center">
                         <button onClick={() => setEditando(f.id)}
-                          className="text-[11.5px] text-brand-mid hover:underline">editar</button>
+                          className="text-[11.5px] text-brand-mid hover:underline acao-toque">editar</button>
                         <button onClick={async () => { await alternarForma(f.id, !f.active); reload() }}
-                          className="text-[11.5px] text-ink-3 hover:text-brand">
+                          className="text-[11.5px] text-ink-3 hover:text-brand acao-toque">
                           {f.active ? 'desativar' : 'reativar'}
                         </button>
                         <button onClick={async () => { await removerForma(f.id); reload() }}

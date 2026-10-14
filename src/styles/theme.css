@@ -94,6 +94,36 @@
   animation: lbShimmer 1.3s linear infinite;
 }
 
+/* Celular — medido no Chromium a 375px, 14/10/2026.
+
+   O sistema é usado de pé: a equipe confere pedido e marca Montado com o
+   celular na mão, e quem pede pelo link público está sempre no telefone.
+
+   1. FONTE DE 16px NO CAMPO. Abaixo disso o Safari do iPhone dá zoom sozinho
+      ao focar o campo, e a pessoa tem de pinçar de volta a cada campo de um
+      cadastro. Os campos do protótipo têm 12,5 e 13px, que é o certo no
+      computador — então a regra vale só no celular, e o desktop fica igual.
+      Não se resolve com `maximum-scale=1` no viewport: isso tira o zoom da
+      pessoa que precisa dele para ler.
+
+   2. ALVO DE TOQUE DE 40px nas ações escritas em texto ("Editar",
+      "Desativar", "Abrir ficha", "chamar no WhatsApp"). Medidas antes:
+      33x18, 50x17, 57x18 — e "Desativar" aparece 55 vezes na lista de ZIPs.
+      Dedo não acerta linha de 17px, e errar aqui desativa um ZIP de entrega.
+      Só a altura do TOQUE cresce; o texto continua do mesmo tamanho, então a
+      tela não muda de aparência. */
+@media (max-width: 767px) {
+  input, select, textarea { font-size: 16px; }
+  .acao-toque {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    /* largura também: o "—" de plano sem preço tinha 11px de alvo */
+    min-width: 2.25rem;
+  }
+}
+
 /* Impressão — a folha da cozinha vai para a bancada em papel (§9.3).
    Sem isto, a nav verde come 176px de cada página e os blocos quebram no meio. */
 @media print {

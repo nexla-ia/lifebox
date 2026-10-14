@@ -40,7 +40,7 @@ export function PlanosPrecos({ catalogo, podeEditar, onSaved }: Props) {
         acao={podeEditar && (
           <button
             onClick={() => setCriandoPlano(true)}
-            className="text-[12px] text-brand-mid hover:underline whitespace-nowrap"
+            className="text-[12px] text-brand-mid hover:underline acao-toque whitespace-nowrap"
           >
             ＋ Novo plano
           </button>
@@ -254,7 +254,7 @@ function LinhaPlano({
               <div className="flex gap-2 justify-end">
                 <button
                   onClick={() => setEditando(false)}
-                  className="text-[12px] text-ink-3 hover:text-ink"
+                  className="text-[12px] text-ink-3 hover:text-ink acao-toque"
                 >
                   Cancelar
                 </button>
@@ -267,7 +267,7 @@ function LinhaPlano({
                 </button>
               </div>
             ) : (
-              <button onClick={abrir} className="text-[12px] text-brand-mid hover:underline">
+              <button onClick={abrir} className="text-[12px] text-brand-mid hover:underline acao-toque">
                 Editar
               </button>
             )}
@@ -334,7 +334,7 @@ function CelulaValor({
       ) : podeEditar ? (
         <button
           onClick={() => { setTexto(valor !== null ? moneyInput(valor) : ''); setEditando(true) }}
-          className="tnum text-ink hover:text-brand hover:underline"
+          className="tnum text-ink hover:text-brand hover:underline acao-toque"
           title="Clique para editar"
         >
           {valor === null ? '—' : money(valor)}

@@ -183,7 +183,7 @@ export function FichaPedido({ dados, onCancelar, onCriado }: Props) {
                   </div>
                 </div>
                 <button onClick={() => { setClienteId(''); setBuscaCliente('') }}
-                  className="text-[12px] text-brand-mid hover:underline">Trocar</button>
+                  className="text-[12px] text-brand-mid hover:underline acao-toque">Trocar</button>
               </div>
             ) : (
               <>

@@ -45,7 +45,10 @@ test.describe('perfil Operação', () => {
 
   test('o menu tem o que é dela, e só isso', async ({ page }) => {
     await entrar(page)
-    const menu = await page.locator('nav').innerText()
+    // `#menu-lateral`, nao `nav`: o Overview e o Config tem <nav> proprios
+    // para as abas, e `locator('nav')` casa com os dois — passa ou estoura
+    // dependendo de qual montou primeiro.
+    const menu = await page.locator('#menu-lateral').innerText()
 
     for (const tela of PERMITIDAS) {
       expect(menu, `Operação precisa de ${tela} no menu`).toContain(tela)

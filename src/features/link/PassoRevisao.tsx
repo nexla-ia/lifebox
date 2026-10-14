@@ -200,7 +200,7 @@ function Bloco({
         <h2 className="text-[11px] uppercase tracking-wide text-ink-muted font-semibold">
           {titulo}
         </h2>
-        <button onClick={onEditar} className="text-[11.5px] text-brand-mid hover:underline">
+        <button onClick={onEditar} className="text-[11.5px] text-brand-mid hover:underline acao-toque">
           {rotuloEditar}
         </button>
       </header>

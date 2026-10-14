@@ -228,6 +228,57 @@ inteiro dentro do `Desmarcar…`. O teste segue, navega antes de a RPC terminar,
 e o erro aparece lá adiante como saldo que não fecha. Em toggle, use
 `exact: true` (helper `botao()` em `e2e/montagem.spec.ts`).
 
+## Celular
+
+O protótipo é de computador, e o sistema foi construído contra ele. Medido no
+Chromium em 14/10/2026, de 360 a 1280px:
+
+**A nav era uma barra FIXA de 176px.** Num iPhone de 375px sobravam **199px**
+de conteúdo em toda tela. Overview, Semana, Clientes e Configurações
+estouravam a largura; as outras só não estouravam porque as tabelas rolam por
+dentro — numa janela de 199px, que não serve para conferir nada.
+
+Com a nav fora do caminho as 15 telas couberam em 375px com **zero estouro**:
+o conteúdo já era fluido. Por isso o conserto é um só, no `AppLayout` — nav
+vira gaveta abaixo de `md`, e acima disso é a barra do protótipo, idêntica.
+Espalhar `sm:`/`md:` pelas telas teria sido consertar o que não estava quebrado.
+
+Duas coisas de toque, também medidas:
+
+- **Campo com fonte de 16px no celular.** Abaixo disso o Safari do iPhone dá
+  zoom sozinho ao focar, e a pessoa pinça de volta a cada campo do cadastro.
+  Os 12,5/13px do protótipo ficam no computador. **Não** se resolve com
+  `maximum-scale=1`: isso tira o zoom de quem precisa dele para ler.
+- **`.acao-toque` dá 40px de alvo** às ações escritas em texto (Editar,
+  Desativar, Abrir ficha, chamar no WhatsApp). Mediam 33x18, 50x17, 57x18 — e
+  "Desativar" aparece **67 vezes** entre ZIPs, usuários e catálogo. Dedo não
+  acerta 17px, e errar ali desativa um ZIP de entrega. Cresce só o alvo; o
+  texto fica do mesmo tamanho, então a tela não muda de aparência.
+
+Ficam abaixo de 40px, de propósito: as abas e os chips (26 a 35px). São blocos
+com borda e espaçamento, usáveis no toque, e crescê-los mudaria a cara de toda
+tela — o protótipo é aprovado pela cliente, então isso é decisão dela.
+
+`e2e/celular.spec.ts` prende a regra: **nenhuma tela pede rolagem horizontal de
+PÁGINA a 375px**. Rolagem dentro de um container não conta e é intencional — a
+folha da cozinha tem colunas demais para um celular, e rolar a tabela é melhor
+que esconder coluna.
+
+**O teste tem de esperar o CONTEÚDO, não o cabeçalho.** A primeira versão
+media depois do heading e passava em 3,8s para dez telas: o esqueleto é feito
+de blocos de largura percentual e nunca estoura, então o verde não dizia nada.
+Hoje espera `.skeleton` e `aria-busy` zerarem. Conferido falhando com a nav
+antiga, que acusa "Overview estoura 102px" e nomeia os elementos.
+
+A barra lateral tem `id="menu-lateral"`, e é por ele que os testes a leem:
+`locator('nav')` casava com DOIS elementos no Overview e no Config, que têm
+`<nav>` próprio para as abas — passava ou estourava conforme qual montasse
+primeiro.
+
+Arrastar no toque já estava resolvido antes: a ordenação da Montagem e do menu
+tem setas ▲▼ ao lado do arrasto, porque `draggable` não funciona no toque de
+boa parte dos navegadores.
+
 ## Usuários
 
 O perfil operacional vive em `public.profiles`; quem cria a linha é o gatilho

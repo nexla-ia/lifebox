@@ -86,7 +86,7 @@ export function DrillDown({
                         </div>
                       )}
                       <Link to={`/clientes?busca=${encodeURIComponent(l.cliente.trim())}`}
-                        className="text-[11px] text-brand-mid hover:underline">
+                        className="text-[11px] text-brand-mid hover:underline acao-toque">
                         Ficha
                       </Link>
                     </div>

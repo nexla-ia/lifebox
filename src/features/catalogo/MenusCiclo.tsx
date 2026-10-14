@@ -275,7 +275,7 @@ function ColunaCategoria({
                 </div>
                 {podeEditar && (
                   <div className="flex flex-col items-end gap-1 shrink-0">
-                    <button onClick={() => onEditar(p)} className="text-[11.5px] text-brand-mid hover:underline">
+                    <button onClick={() => onEditar(p)} className="text-[11.5px] text-brand-mid hover:underline acao-toque">
                       Editar
                     </button>
                     <button

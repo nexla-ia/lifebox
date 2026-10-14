@@ -116,7 +116,10 @@ test.describe('usuários e convite', () => {
     await expect(page.getByText(nomeConvidado)).toBeVisible()
 
     // o papel veio do convite: o menu dela não tem mais nada (§3)
-    const menu = await page.locator('nav').innerText()
+    // `#menu-lateral`, nao `nav`: o Overview e o Config tem <nav> proprios
+    // para as abas, e `locator('nav')` casa com os dois — passa ou estoura
+    // dependendo de qual montou primeiro.
+    const menu = await page.locator('#menu-lateral').innerText()
     expect(menu).toContain('Produção')
     for (const proibido of ['Overview', 'Semana', 'Clientes', 'Catálogo', 'Configurações']) {
       expect(menu, `Cozinha não pode ver ${proibido}`).not.toContain(proibido)

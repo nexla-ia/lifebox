@@ -27,7 +27,10 @@ test.describe('login', () => {
     // §3: cada perfil entra direto na sua tela
     await page.waitForURL(/overview|semana|producao/, { timeout: 20_000 })
 
-    const menu = await page.locator('nav').innerText()
+    // `#menu-lateral`, nao `nav`: o Overview e o Config tem <nav> proprios
+    // para as abas, e `locator('nav')` casa com os dois — passa ou estoura
+    // dependendo de qual montou primeiro.
+    const menu = await page.locator('#menu-lateral').innerText()
     // o menu tem que refletir o papel — nem mais, nem menos (§3, screens.ts)
     if (new URL(page.url()).pathname === '/overview') {
       for (const item of ['Overview', 'Semana', 'Clientes', 'Produção', 'Configurações']) {

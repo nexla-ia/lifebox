@@ -80,7 +80,7 @@ export function ZipCodes({ podeEditar }: { podeEditar: boolean }) {
                   <>
                     <button
                       onClick={async () => { await alternarZip(z.zip, !z.active); reload() }}
-                      className="text-[11.5px] text-ink-3 hover:text-ink"
+                      className="text-[11.5px] text-ink-3 hover:text-ink acao-toque"
                     >
                       {z.active ? 'Desativar' : 'Reativar'}
                     </button>

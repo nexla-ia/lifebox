@@ -201,7 +201,7 @@ function CardEstoque({
           </div>
           {podeEditar ? (
             <button onClick={() => { setTexto(String(total)); setEditando(true) }}
-              className="text-[11px] text-brand-mid hover:underline">
+              className="text-[11px] text-brand-mid hover:underline acao-toque">
               {total > 0 ? 'editar' : 'informar quantas bags vocês têm'}
             </button>
           ) : (

@@ -36,7 +36,7 @@ export function Adicionais({ podeEditar }: { podeEditar: boolean }) {
           <button
             onClick={() => setEditando({ category: 'juice', charges_tax: false,
               charges_delivery: false, requires_plan: false, includes_meals_qty: 0, active: true })}
-            className="text-[12px] text-brand-mid hover:underline"
+            className="text-[12px] text-brand-mid hover:underline acao-toque"
           >
             ＋ Adicionar
           </button>
@@ -131,8 +131,8 @@ function ItemAdicional({
 
       {podeEditar && (
         <div className="flex flex-col items-end gap-1.5 shrink-0">
-          <button onClick={onEditar} className="text-[12px] text-brand-mid hover:underline">Editar</button>
-          <button onClick={onToggle} className="text-[11.5px] text-ink-3 hover:text-ink">
+          <button onClick={onEditar} className="text-[12px] text-brand-mid hover:underline acao-toque">Editar</button>
+          <button onClick={onToggle} className="text-[11.5px] text-ink-3 hover:text-ink acao-toque">
             {addon.active ? 'Desativar' : 'Reativar'}
           </button>
         </div>

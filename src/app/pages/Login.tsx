@@ -90,7 +90,7 @@ export function Login() {
 
         <div className="flex justify-between items-baseline mb-1.5">
           <label htmlFor="senha" className="text-xs font-semibold text-ink-2">Senha</label>
-          <button type="button" onClick={esqueci} className="text-xs text-brand-mid hover:underline">
+          <button type="button" onClick={esqueci} className="text-xs text-brand-mid hover:underline acao-toque">
             Esqueci minha senha
           </button>
         </div>

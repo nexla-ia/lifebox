@@ -159,9 +159,9 @@ function Linha({
           ) : (
             <>
               <button onClick={() => setEditando(true)}
-                className="text-[11.5px] text-brand-mid hover:underline">editar</button>
+                className="text-[11.5px] text-brand-mid hover:underline acao-toque">editar</button>
               <button onClick={async () => { await alternarOrigem(o.id, !o.active); onMudou() }}
-                className="text-[11.5px] text-ink-3 hover:text-brand">
+                className="text-[11.5px] text-ink-3 hover:text-brand acao-toque">
                 {o.active ? 'desativar' : 'reativar'}
               </button>
               <button onClick={tentarRemover} aria-label={`Remover ${o.name}`}

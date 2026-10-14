@@ -204,7 +204,7 @@ export function ClientesPage() {
                   <td className="px-3 text-right whitespace-nowrap">
                     <button
                       onClick={() => setVista({ tela: 'ficha', id: c.id })}
-                      className="text-[12px] text-brand-mid hover:underline"
+                      className="text-[12px] text-brand-mid hover:underline acao-toque"
                     >
                       Abrir ficha
                     </button>
@@ -275,7 +275,7 @@ function Sumindo() {
                 {' · '}{c.pedidos_no_total} pedido{c.pedidos_no_total === 1 ? '' : 's'} no total
               </span>
               <a href={linkWhatsApp(c.telefone)} target="_blank" rel="noreferrer"
-                className="ml-auto text-brand-mid hover:underline">
+                className="ml-auto text-brand-mid hover:underline acao-toque">
                 chamar no WhatsApp ↗
               </a>
             </li>

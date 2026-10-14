@@ -163,14 +163,14 @@ export function Usuarios({ podeEditar }: { podeEditar: boolean }) {
                                   nome: u.full_name,
                                   url: `${window.location.origin}/convite/${t}`,
                                 })
-                              }} className="text-[11.5px] text-brand-mid hover:underline">
+                              }} className="text-[11.5px] text-brand-mid hover:underline acao-toque">
                                 novo link
                               </button>
                             )}
                             <button
                               onClick={() => acao(() => definirStatus(
                                 u.id, u.status === 'desativado' ? 'ativo' : 'desativado'))}
-                              className="text-[11.5px] text-ink-3 hover:text-brand">
+                              className="text-[11.5px] text-ink-3 hover:text-brand acao-toque">
                               {u.status === 'desativado' ? 'reativar' : 'desativar'}
                             </button>
                           </div>

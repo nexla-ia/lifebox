@@ -71,7 +71,7 @@ export function DetalhePedido({ orderId, onVoltar }: {
   return (
     <div className="flex flex-col gap-4 max-w-3xl">
       <header className="flex items-center gap-3 flex-wrap">
-        <button onClick={onVoltar} className="text-[12.5px] text-brand-mid hover:underline">
+        <button onClick={onVoltar} className="text-[12.5px] text-brand-mid hover:underline acao-toque">
           ‹ Semana
         </button>
         <div>
@@ -94,7 +94,7 @@ export function DetalhePedido({ orderId, onVoltar }: {
         )}
         {p.telefone && (
           <a href={linkWhatsApp(p.telefone)} target="_blank" rel="noreferrer"
-             className="ml-auto text-[12.5px] text-brand-mid hover:underline">
+             className="ml-auto text-[12.5px] text-brand-mid hover:underline acao-toque">
             {formatarTelefone(p.telefone)} ↗
           </a>
         )}
