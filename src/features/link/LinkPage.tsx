@@ -29,7 +29,9 @@ import { Aviso } from './ui'
  * botão do navegador no meio de um pedido perderia a seleção. Os "Editar" da
  * revisão levam de volta ao passo certo (tela 6i). */
 
-type Passo = 'identificacao' | 'plano' | 'pratos' | 'adicionais' | 'revisao' | 'pronto'
+type Passo =
+  | 'identificacao' | 'plano' | 'pratos' | 'breakfasts'
+  | 'adicionais' | 'revisao' | 'pronto'
 
 export function LinkPage() {
   const [params, setParams] = useSearchParams()
@@ -52,6 +54,29 @@ export function LinkPage() {
   } | null>(null)
 
   const itens = useMemo(() => itensDoPedido(pratos, addons), [pratos, addons])
+
+  /** A etapa de breakfast existe quando há breakfast para escolher (relato da
+   *  cliente, 09/11/2026 — o site dela separa em abas).
+   *
+   *  No plano, quem decide é a cota: plano sem breakfast não ganha a etapa, e
+   *  era essa a regra de 22/09/2026. No Personalizado, decide o menu da
+   *  semana: se não houver prato de breakfast, a etapa seria uma página vazia.
+   *
+   *  Fora do `useMemo` de propósito — depende do catálogo, que já chegou. */
+  const plano = catalogo.data?.plans.find((p) => p.id === escolha.plan_id) ?? null
+  const temEtapaBreakfast = escolha.kind === 'custom'
+    ? (catalogo.data?.dishes ?? []).some((d) => d.category === 'breakfast')
+    : (plano?.breakfasts_qty ?? 0) > 0
+
+  // "Passo N de M" — a cliente pediu o fluxo em etapas, e etapa sem número
+  // não diz quanto falta. M muda com a etapa de breakfast.
+  const totalPassos = temEtapaBreakfast ? 6 : 5
+  const numeroDoPasso: Record<Passo, number> = {
+    identificacao: 1, plano: 2, pratos: 3,
+    breakfasts: 4,
+    adicionais: temEtapaBreakfast ? 5 : 4,
+    revisao: totalPassos, pronto: totalPassos,
+  }
 
   const trocarIdioma = () => {
     params.set('lang', lang === 'pt' ? 'en' : 'pt')
@@ -185,14 +210,28 @@ export function LinkPage() {
 
       {passo === 'pratos' && (
         <PassoPratos t={t} lang={lang} catalogo={cat} escolha={escolha}
+          categoria="meal"
+          passoN={numeroDoPasso.pratos} passoTotal={totalPassos}
           pratos={pratos} setPratos={setPratos}
-          onVoltar={() => setPasso('plano')} onAvancar={() => setPasso('adicionais')} />
+          onVoltar={() => setPasso('plano')}
+          onAvancar={() => setPasso(temEtapaBreakfast ? 'breakfasts' : 'adicionais')} />
+      )}
+
+      {passo === 'breakfasts' && (
+        <PassoPratos t={t} lang={lang} catalogo={cat} escolha={escolha}
+          categoria="breakfast"
+          passoN={numeroDoPasso.breakfasts} passoTotal={totalPassos}
+          pratos={pratos} setPratos={setPratos}
+          onVoltar={() => setPasso('pratos')}
+          onAvancar={() => setPasso('adicionais')} />
       )}
 
       {passo === 'adicionais' && (
         <PassoAdicionais t={t} lang={lang} catalogo={cat} escolha={escolha}
           addons={addons} setAddons={setAddons}
-          onVoltar={() => setPasso('pratos')}
+          podeRevisar={itens.length > 0}
+          passoN={numeroDoPasso.adicionais} passoTotal={totalPassos}
+          onVoltar={() => setPasso(temEtapaBreakfast ? 'breakfasts' : 'pratos')}
           onAvancar={() => setPasso('revisao')} />
       )}
 
@@ -202,6 +241,7 @@ export function LinkPage() {
           confirmando={confirmando} erro={erro}
           onVoltar={() => setPasso('adicionais')}
           onEditar={(p) => setPasso(p)}
+          temEtapaBreakfast={temEtapaBreakfast}
           onConfirmar={confirmar} />
       )}
 

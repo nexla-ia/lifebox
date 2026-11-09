@@ -151,12 +151,30 @@ export function PassoPlano({
 }
 
 // ------------------------------------------------------ passo 3 · 6b, 6c, 6d
+/** Uma CATEGORIA por página (relato da cliente, 09/11/2026).
+ *
+ *  O link mostrava refeição e breakfast na mesma grade. Medido no navegador:
+ *  num plano "5 Refeições + 5 Breakfasts" os cinco breakfasts apareciam no
+ *  meio dos pratos, e dava para seguir com `4 of 5 meals` e `0 of 5
+ *  breakfasts` — o pedido fechava faltando cinco breakfasts que a pessoa
+ *  pagou. O site da LifeBox separa em abas (Menu of the Week, Breakfasts &
+ *  Snacks), e é esse o fluxo que ela espera.
+ *
+ *  Desvio consciente do protótipo aprovado (6b), pedido pela cliente —
+ *  registrado em DECISOES-ABERTAS.
+ *
+ *  A TRAVA é por etapa e exige a cota do plano. Passar do limite continua
+ *  permitido e cobrado como extra (§5.2): o que não pode é ficar ABAIXO e
+ *  seguir, porque aí a cozinha monta uma sacola incompleta e ninguém vê. */
 export function PassoPratos({
   t, lang, catalogo, escolha, pratos, setPratos, onAvancar, onVoltar,
+  categoria, passoN, passoTotal,
 }: {
   t: Textos; lang: Idioma; catalogo: CatalogoLink; escolha: Escolha
   pratos: MapaQtd; setPratos: (m: MapaQtd) => void
   onAvancar: () => void; onVoltar: () => void
+  categoria: 'meal' | 'breakfast'
+  passoN: number; passoTotal: number
 }) {
   const [filtro, setFiltro] = useState<string>('')
   const [avisoExtra, setAvisoExtra] = useState<{ dish: string; size: string } | null>(null)
@@ -164,24 +182,28 @@ export function PassoPratos({
   const plano = catalogo.plans.find((p) => p.id === escolha.plan_id) ?? null
   const custom = escolha.kind === 'custom'
 
+  // só as tags dos pratos DESTA etapa: oferecer um filtro que não casa com
+  // nada nesta página devolve grade vazia e parece que o menu acabou
   const tags = useMemo(() => {
     const m = new Map<string, { code: string; label_pt: string; label_en: string; icon: string | null }>()
-    for (const d of catalogo.dishes) for (const tg of d.tags) m.set(tg.code, tg)
+    for (const d of catalogo.dishes) {
+      if ((d.category === 'breakfast') !== (categoria === 'breakfast')) continue
+      for (const tg of d.tags) m.set(tg.code, tg)
+    }
     return [...m.values()]
-  }, [catalogo.dishes])
+  }, [catalogo.dishes, categoria])
 
 
-  /** Breakfast só aparece para plano que tem breakfast (reunião de
-   *  22/09/2026): oferecer o que não entra no plano é convidar a escolher
-   *  errado e descobrir na revisão, quando vira extra. No Personalizado tudo
-   *  aparece, porque ali cada item é cobrado por unidade. */
-  const doPlano = custom || (plano?.breakfasts_qty ?? 0) > 0
-    ? catalogo.dishes
-    : catalogo.dishes.filter((d) => d.category !== 'breakfast')
+  /** Só a categoria DESTA etapa. Breakfast continua aparecendo apenas para
+   *  plano que tem breakfast (reunião de 22/09/2026) — quem decide é o
+   *  LinkPage, que nem monta a etapa nesse caso. */
+  const bkfEtapa = categoria === 'breakfast'
+  const daCategoria = catalogo.dishes.filter(
+    (d) => (d.category === 'breakfast') === bkfEtapa)
 
   const visiveis = filtro
-    ? doPlano.filter((d) => d.tags.some((tg) => tg.code === filtro))
-    : doPlano
+    ? daCategoria.filter((d) => d.tags.some((tg) => tg.code === filtro))
+    : daCategoria
 
   // contagem só para o progresso e para o aviso de extra — preço é do servidor
   const conta = (bkf: boolean) =>
@@ -220,24 +242,55 @@ export function PassoPratos({
   const tamanhosCustom = catalogo.sizes.filter((s) =>
     catalogo.custom_prices.some((c) => c.size_id === s.id))
 
-  const totalEscolhido = Object.values(pratos).reduce((a, b) => a + b, 0)
-  const podeAvancar = custom ? totalEscolhido > 0 : refeicoes + breakfasts > 0
+  // ------------------------------------------------- a trava desta etapa
+  // Antes: `refeicoes + breakfasts > 0` — UM item em QUALQUER categoria
+  // liberava o botão. Era por isso que dava para seguir com 4 de 5 refeições
+  // e 0 de 5 breakfasts.
+  const cota = bkfEtapa ? (plano?.breakfasts_qty ?? 0) : (plano?.meals_qty ?? 0)
+  const escolhidos = bkfEtapa ? breakfasts : refeicoes
+  const faltando = Math.max(0, cota - escolhidos)
+
+  // No Personalizado não há cota: cada item é cobrado por unidade e a pessoa
+  // pode querer só breakfast. A exigência de ter ALGO no pedido fica no fim,
+  // na etapa de adicionais, que é a última antes da revisão.
+  const podeAvancar = custom || faltando === 0
+
+  const rotuloCategoria = bkfEtapa ? t.breakfasts : t.refeicoes
+
+  // só para o RÓTULO do botão: "Escolher breakfasts" quando ainda vem essa
+  // etapa, "Ver adicionais" quando esta é a última de prato
+  const temBreakfastNoPlano = custom
+    ? catalogo.dishes.some((d) => d.category === 'breakfast')
+    : (plano?.breakfasts_qty ?? 0) > 0
 
   return (
     <div className="flex flex-col gap-4">
       <Voltar onClick={onVoltar}>{t.voltar}</Voltar>
 
-      {plano && (
+      <div className="flex flex-col gap-0.5">
+        <span className="text-[11px] uppercase tracking-wide text-ink-muted font-semibold">
+          {t.passoDe.replace('{n}', String(passoN)).replace('{total}', String(passoTotal))}
+        </span>
         <h1 className="text-[17px] font-bold text-brand">
-          {nome(plano, lang)}
-          {escolha.size_id && ` · ${catalogo.sizes.find((s) => s.id === escolha.size_id)?.name}`}
+          {bkfEtapa ? t.tituloBreakfasts : t.tituloRefeicoes}
         </h1>
-      )}
-      {custom && <h1 className="text-[17px] font-bold text-brand">✎ {t.personalizado}</h1>}
+        <span className="text-[12px] text-ink-3">
+          {plano
+            ? `${nome(plano, lang)}${escolha.size_id
+                ? ` · ${catalogo.sizes.find((s) => s.id === escolha.size_id)?.name}` : ''}`
+            : `✎ ${t.personalizado}`}
+        </span>
+      </div>
 
-      {plano && refeicoes >= plano.meals_qty && plano.meals_qty > 0 && (
-        <Aviso tom="ok">✅ {t.limiteAtingido}</Aviso>
+      {/* chegou na cota: diz que está completo em vez de deixar a pessoa
+          contando de cabeça */}
+      {!custom && cota > 0 && faltando === 0 && (
+        <Aviso tom="ok">✅ {bkfEtapa ? t.completo : t.limiteAtingido}</Aviso>
       )}
+
+      {/* etapa sem item nenhum no menu da semana: sem isto a página fica
+          branca e parece que o link quebrou (§8) */}
+      {daCategoria.length === 0 && <Aviso tom="info">{t.semItens}</Aviso>}
 
       {tags.length > 0 && (
         <div className="flex gap-2 flex-wrap">
@@ -299,7 +352,7 @@ export function PassoPratos({
                           {' '}{money(unitCustom(s.id) ?? 0)}/un
                         </span>
                       </span>
-                      <Contador qty={pratos[chave(d.id, s.id)] ?? 0}
+                      <Contador t={t} qty={pratos[chave(d.id, s.id)] ?? 0}
                         rotulo={`${nome(d, lang)} ${s.name}`}
                         onMudar={(n) => setPratos({ ...pratos, [chave(d.id, s.id)]: n })} />
                     </div>
@@ -307,7 +360,7 @@ export function PassoPratos({
                 </div>
               ) : (
                 <div className="flex justify-end">
-                  <Contador qty={pratos[chave(d.id, escolha.size_id ?? '')] ?? 0}
+                  <Contador t={t} qty={pratos[chave(d.id, escolha.size_id ?? '')] ?? 0}
                     rotulo={nome(d, lang)}
                     onMudar={(n) => somar(d, escolha.size_id ?? '', n)} />
                 </div>
@@ -341,23 +394,33 @@ export function PassoPratos({
       </div>
 
       <div className="sticky bottom-0 bg-cream/95 backdrop-blur pt-3 pb-4 flex flex-col gap-2">
-        {plano && (
-          <div className="flex gap-4 text-[12.5px] font-semibold text-ink-2">
-            {plano.meals_qty > 0 && (
-              <span aria-label={t.refeicoes}>
-                {refeicoes} {t.de} {plano.meals_qty} {t.refeicoes}
-              </span>
-            )}
-            {plano.breakfasts_qty > 0 && (
-              <span aria-label={t.breakfasts}>
-                {breakfasts} {t.de} {plano.breakfasts_qty} {t.breakfasts}
-              </span>
-            )}
+        {/* o progresso é DESTA etapa: mostrar as duas contagens numa página
+            que só tem uma delas é o que fazia a pessoa achar que já tinha
+            escolhido os breakfasts */}
+        {!custom && cota > 0 && (
+          <div className="flex items-center gap-3">
+            <span className="text-[12.5px] font-semibold text-ink-2"
+              aria-label={rotuloCategoria}>
+              {escolhidos} {t.de} {cota} {rotuloCategoria}
+            </span>
+            <div className="flex-1 h-1.5 rounded-full bg-muted-bg overflow-hidden">
+              <div className="h-full bg-brand-mid transition-[width]"
+                style={{ width: `${Math.min(100, (escolhidos / cota) * 100)}%` }} />
+            </div>
           </div>
         )}
+
+        {/* POR QUE o botão está apagado. Botão morto sem explicação é o que
+            faz a pessoa sair do pedido achando que o site quebrou. */}
+        {!podeAvancar && (
+          <p className="text-[12px] text-late-text font-semibold">
+            {t.faltam} {faltando} {rotuloCategoria}
+          </p>
+        )}
+
         {!custom && <p className="text-[11px] text-ink-muted">{t.semPreco}</p>}
         <BotaoPrincipal onClick={onAvancar} disabled={!podeAvancar}>
-          {t.verAdicionais}
+          {bkfEtapa || !temBreakfastNoPlano ? t.verAdicionais : t.escolherBreakfasts}
         </BotaoPrincipal>
       </div>
     </div>
@@ -367,10 +430,15 @@ export function PassoPratos({
 // ------------------------------------------------------------- passo 4 · 6h
 export function PassoAdicionais({
   t, lang, catalogo, escolha, addons, setAddons, onAvancar, onVoltar,
+  podeRevisar, passoN, passoTotal,
 }: {
   t: Textos; lang: Idioma; catalogo: CatalogoLink; escolha: Escolha
   addons: MapaQtd; setAddons: (m: MapaQtd) => void
   onAvancar: () => void; onVoltar: () => void
+  /** pedido vazio não vai para a revisão: o servidor recusaria, e descobrir
+   *  no último botão é o pior lugar para descobrir */
+  podeRevisar: boolean
+  passoN: number; passoTotal: number
 }) {
   // §5.4: o que exige plano some do fluxo "Só Detox / adicionais" — e o
   // servidor recusaria de qualquer jeito, então some antes de frustrar
@@ -380,7 +448,12 @@ export function PassoAdicionais({
   return (
     <div className="flex flex-col gap-4">
       <Voltar onClick={onVoltar}>{t.voltar}</Voltar>
-      <h1 className="text-[19px] font-bold text-brand">{t.adicionais}</h1>
+      <div className="flex flex-col gap-0.5">
+        <span className="text-[11px] uppercase tracking-wide text-ink-muted font-semibold">
+          {t.passoDe.replace('{n}', String(passoN)).replace('{total}', String(passoTotal))}
+        </span>
+        <h1 className="text-[19px] font-bold text-brand">{t.adicionais}</h1>
+      </div>
       <p className="text-[12px] text-ink-3">{t.adicionaisAjuda}</p>
 
       {visiveis.length === 0 ? (
@@ -399,7 +472,7 @@ export function PassoAdicionais({
                   <span className="text-[13px] font-bold text-brand-mid tnum">
                     {money(a.price_cents)}
                   </span>
-                  <Contador qty={addons[a.id] ?? 0} rotulo={nome(a, lang)}
+                  <Contador t={t} qty={addons[a.id] ?? 0} rotulo={nome(a, lang)}
                     onMudar={(n) => setAddons({ ...addons, [a.id]: n })} />
                 </div>
               </div>
@@ -409,7 +482,9 @@ export function PassoAdicionais({
       )}
 
       <p className="text-[11px] text-ink-muted">{t.semTax}</p>
-      <BotaoPrincipal onClick={onAvancar}>{t.revisar}</BotaoPrincipal>
+      <BotaoPrincipal onClick={onAvancar} disabled={!podeRevisar}>
+        {t.revisar}
+      </BotaoPrincipal>
     </div>
   )
 }

@@ -71,25 +71,35 @@ export function Voltar({ children, onClick }: { children: ReactNode; onClick: ()
 
 /** −/＋ com o número no meio. `aria-label` nos dois botões porque o texto
  *  visível é só um símbolo: sem isso, quem usa leitor de tela ouve "menos". */
+/** Contador de item.
+ *
+ *  É o controle mais tocado do sistema inteiro: quem pede pelo link está no
+ *  celular, e cada refeição do plano passa por aqui. Media 32x32 — abaixo dos
+ *  40px que Apple e Google pedem — então no celular ele cresce para 40 e no
+ *  computador fica como o protótipo aprovado desenhou.
+ *
+ *  Os rótulos acessíveis vêm no idioma da tela. Estavam fixos em português,
+ *  e no link em inglês um leitor de tela anunciava "Somar um Orange Cake". */
 export function Contador({
-  qty, onMudar, rotulo, max,
-}: { qty: number; onMudar: (n: number) => void; rotulo: string; max?: number }) {
+  qty, onMudar, rotulo, max, t,
+}: {
+  qty: number; onMudar: (n: number) => void; rotulo: string; max?: number
+  t: { tirarUm: string; somarUm: string; quantidadeDe: string }
+}) {
+  const botao = 'w-10 h-10 md:w-8 md:h-8 rounded-lg border border-line-strong '
+    + 'bg-surface text-[16px] text-ink-2 disabled:text-line-strong hover:border-brand'
   return (
     <div className="flex items-center gap-1.5">
       <button onClick={() => onMudar(Math.max(0, qty - 1))} disabled={qty === 0}
-        aria-label={`Tirar um ${rotulo}`}
-        className="w-8 h-8 rounded-lg border border-line-strong bg-surface text-[16px]
-                   text-ink-2 disabled:text-line-strong hover:border-brand">
+        aria-label={`${t.tirarUm} ${rotulo}`} className={botao}>
         −
       </button>
-      <span aria-label={`Quantidade de ${rotulo}`}
+      <span aria-label={`${t.quantidadeDe} ${rotulo}`}
         className="w-7 text-center text-[14px] font-bold tnum">
         {qty}
       </span>
       <button onClick={() => onMudar(qty + 1)} disabled={max !== undefined && qty >= max}
-        aria-label={`Somar um ${rotulo}`}
-        className="w-8 h-8 rounded-lg border border-line-strong bg-surface text-[16px]
-                   text-ink-2 disabled:text-line-strong hover:border-brand">
+        aria-label={`${t.somarUm} ${rotulo}`} className={botao}>
         ＋
       </button>
     </div>

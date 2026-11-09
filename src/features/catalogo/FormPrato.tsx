@@ -94,7 +94,12 @@ export function FormPrato({ dados, prato, menuId, menuNome, onCancelar, onSalvo 
         setSalvando(false)
         return
       }
-      await salvarPrato(
+      // CONFERE o erro desta gravação. Ela é que guarda o caminho da foto, e
+      // sem a conferência a tela fechava dizendo "salvo": o arquivo ficava no
+      // Storage e o prato sem foto nenhuma, sem nada na tela dizendo isso.
+      // Falha de escrita em silêncio é o modo de erro mais caro deste
+      // sistema, e aqui ele aparece semanas depois, como "a foto não subiu".
+      const g = await salvarPrato(
         { id: dishId, name_pt: namePt.trim(), name_en: nameEn.trim(),
           desc_pt: descPt.trim() || null, desc_en: descEn.trim() || null,
           category: categoria, protein_tag: proteina || null,
@@ -103,6 +108,11 @@ export function FormPrato({ dados, prato, menuId, menuNome, onCancelar, onSalvo 
           photos: r.url ? [r.url] : [] },
         tagIds, alergIds,
       )
+      if (g.error) {
+        setErro(`Prato salvo, mas a foto não ficou vinculada: ${g.error.message}`)
+        setSalvando(false)
+        return
+      }
     }
 
     setSalvando(false)

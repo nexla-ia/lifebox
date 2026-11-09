@@ -32,8 +32,15 @@ migration. Agora é um número no formulário do adicional.
 ## 1. Lista oficial de ZIP codes atendidos ⚠️ mais urgente
 
 > **Status:** cadastro. A LifeBox preenche em Configurações › ZIP Codes, por
-> cidade. Hoje há 55 CEPs em 2 cidades — quem estiver fora delas é recusado
-> no link, então é o item que mais atrasa o uso real.
+> cidade. Hoje há 55 CEPs, **todos em Boston e East Boston** — quem estiver
+> fora é recusado no link, então é o item que mais atrasa o uso real.
+>
+> **Aconteceu de verdade (09/11/2026):** no teste de vocês, o endereço "16
+> Irving St, 01702" (Framingham) não fechou pedido, porque 01702 não está
+> cadastrado. O sistema estava certo em recusar; o que estava errado era
+> recusar **em silêncio**, e isso já foi consertado — hoje a tela diz "não
+> entregamos neste ZIP ainda" assim que o CEP é digitado. Mas Framingham
+> continua fora até a lista entrar.
 
 
 **O que precisamos:** a lista completa dos CEPs que vocês atendem, e a rota de
@@ -308,6 +315,74 @@ soma os dois pedidos, sempre.
 
 Se vocês preferirem que Total Pedidos conte clientes, é uma linha — mas aí o
 número deixa de bater com a quantidade de sacolas que sai no domingo.
+
+---
+
+## 17. O cutoff está em SEXTA, e a regra diz quinta ⚠️ decidir esta semana
+
+> **Status:** cadastro, um clique. Configurações › Cutoff.
+
+**O que o sistema está fazendo agora:** a faixa do link público diz
+*"order by Friday 6:00 PM"*, e fecha mesmo na **sexta às 18h** (fuso de
+Boston). Conferido no banco: o cutoff da W46 está gravado em
+sexta, 13/11, 18h.
+
+**O que o documento-mestre e o site de vocês dizem:** quinta às 18h. O site
+mostra *"Order by Thursday 6 PM ET"*.
+
+**Por que não mudamos sozinhos:** o cutoff é cadastro de vocês, e mexer nele
+agora **fecha o link um dia mais cedo numa semana que já está aberta**, com
+cliente podendo estar pedindo. Essa decisão é de vocês, não nossa.
+
+- Se o certo é **quinta**: mudem em Configurações › Cutoff. O sistema realinha
+  as semanas que ainda não terminaram e deixa as fechadas como estão.
+- Se vocês mudaram para **sexta de propósito**, é só nos dizer — aí atualizamos
+  o documento e o site, que é o que está desencontrado.
+
+Enquanto houver diferença, quem lê o site e quem lê o link recebem prazos
+diferentes.
+
+---
+
+## 18. Fotos e informação dos pratos ⚠️ o que mais muda a cara do link
+
+> **Status:** cadastro. Catálogo › Pratos.
+
+O link público já mostra foto, selos (Gluten-Free, Low Carb…), macros
+(Cal/Prot/Carbs/Fat) e alérgenos ("Contém:") em cada prato — do mesmo jeito
+que o site de vocês. O que falta é o **conteúdo**. Conferido em 09/11/2026:
+
+| Informação | Preenchida |
+|---|---|
+| Foto | **0** de 21 pratos |
+| Calorias e macros | 1 de 21 |
+| Selos (tags) | 4 de 21 |
+| Alérgenos | 1 de 21 |
+
+Os adicionais também estão sem foto (0 de 6). Por isso o link mostra o quadro
+cinza de "sem foto": não é falha do sistema, é campo em branco. As fotos do
+site de vocês servem — o upload é na própria tela do prato.
+
+---
+
+## 19. Breakfast e refeição viraram etapas separadas ✅ feito
+
+> **Status:** feito em 09/11/2026, a pedido de vocês. Desvio consciente do
+> protótipo aprovado (cartão 6b), registrado aqui.
+
+O protótipo tinha uma página só para escolher os pratos. No teste de vocês os
+breakfasts apareceram no meio das refeições, e dava para seguir com **4 de 5
+refeições e 0 de 5 breakfasts** — o pedido fechava faltando cinco breakfasts
+pagos, e a cozinha montaria a sacola incompleta sem ninguém notar.
+
+Agora o link segue o seu site: **Menu da semana → Breakfasts e snacks →
+Extras e adicionais**, cada um numa página, com "Passo 3 de 6", a contagem da
+etapa ("0 de 5 breakfasts") e o botão travado até a conta fechar, dizendo o que
+falta. Passar do limite continua valendo e é cobrado como extra.
+
+Na revisão, refeições e breakfasts aparecem em blocos separados com a cota ao
+lado — e o bloco de breakfast aparece **mesmo vazio** quando o plano tem cota,
+para dar para ver o que falta.
 
 ---
 

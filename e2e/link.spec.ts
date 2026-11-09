@@ -20,6 +20,19 @@ const ZIP_OK = '02118'
 const ZIP_FORA = '99999'
 const telefone = `+1508${marca}1`
 const digitado = `508${marca}1`
+/* Número PRÓPRIO para os testes de etapa.
+ *
+ * O limite do link é de 6 consultas por telefone em 10 minutos (§9.7), e todo
+ * teste daqui começa identificando. Pendurar dois testes novos no mesmo número
+ * estourou o teto, e quem quebrou foi o ÚLTIMO teste do arquivo — acusando
+ * "não vejo o pedido que já existe", a dez posições da causa.
+ *
+ * Soltar o teto no `beforeEach` seria o caminho, e não funciona: a função que
+ * solta está quebrada em produção (migration 20261109160000). Número próprio
+ * resolve sem depender dela, e estes dois testes não fecham pedido — então não
+ * criam cliente nem precisam de limpeza. */
+const etapas1 = `508${marca}3`
+const etapas2 = `508${marca}4`
 
 let fx: Awaited<ReturnType<typeof criarFixturePedido>> = null
 let webhookAntes = ''
@@ -46,6 +59,22 @@ async function identificar(page: Page, tel = digitado) {
     await page.getByLabel('ZIP code').blur()
   }
   await expect(page.getByText('Delivery available')).toBeVisible({ timeout: 20_000 })
+}
+
+/** Soma um prato N vezes. O rótulo acessível do contador sai no IDIOMA da
+ *  tela desde 09/11/2026 — estava fixo em português, e no link em inglês um
+ *  leitor de tela anunciava "Somar um Orange Cake". */
+const somar = (page: Page, prato: string) =>
+  page.getByRole('button', { name: `Add one ${prato}` })
+
+/** Completa as duas etapas de prato do plano do fixture (10 refeições + 5
+ *  breakfasts). Virou helper porque refeição e breakfast são PÁGINAS
+ *  diferentes desde 09/11/2026, e cada etapa exige a cota antes de liberar. */
+async function escolherPratosDoPlano(page: Page, marca: string, refeicoes = 10) {
+  for (let i = 0; i < refeicoes; i++) await somar(page, `Dish ${marca}`).click()
+  await page.getByRole('button', { name: 'Choose your breakfasts' }).click()
+  for (let i = 0; i < 5; i++) await somar(page, `Bkf ${marca}`).click()
+  await page.getByRole('button', { name: 'See add-ons' }).click()
 }
 
 /** Sai do passo 1. O rótulo do botão muda quando a pessoa já tem pedido na
@@ -135,7 +164,7 @@ test.describe('link público', () => {
     await page.getByRole('button', { name: 'Choose your meals' }).click()
 
     // 10 refeições: o plano do fixture é 10 meals + 5 breakfasts
-    const somar = page.getByRole('button', { name: `Somar um Dish ${marca}` })
+    const somar = page.getByRole('button', { name: `Add one Dish ${marca}` })
     for (let i = 0; i < 10; i++) await somar.click()
     await expect(page.getByLabel('meals')).toHaveText(`10 of 10 meals`)
     await expect(page.getByText('You have already picked all the meals in your plan.'))
@@ -160,19 +189,19 @@ test.describe('link público', () => {
     await page.getByRole('button', { name: 'Choose your meals' }).click()
 
     // 11 refeições: a 11ª entra como extra, de olho no valor (tela 6d)
-    const somar = page.getByRole('button', { name: `Somar um Dish ${marca}` })
-    for (let i = 0; i < 10; i++) await somar.click()
-    await somar.click()
+    for (let i = 0; i < 10; i++) await somar(page, `Dish ${marca}`).click()
+    await somar(page, `Dish ${marca}`).click()
     await page.getByRole('button', { name: 'Add as extra' }).click()
     await expect(page.getByLabel('meals')).toHaveText('11 of 10 meals')
 
-    for (let i = 0; i < 5; i++) {
-      await page.getByRole('button', { name: `Somar um Bkf ${marca}` }).click()
-    }
+    // breakfast é OUTRA página desde 09/11/2026, e o progresso de cada etapa
+    // só mostra a contagem dela
+    await page.getByRole('button', { name: 'Choose your breakfasts' }).click()
+    for (let i = 0; i < 5; i++) await somar(page, `Bkf ${marca}`).click()
     await expect(page.getByLabel('breakfasts')).toHaveText('5 of 5 breakfasts')
 
     await page.getByRole('button', { name: 'See add-ons' }).click()
-    await page.getByRole('button', { name: `Somar um Juice ${marca}` }).click()
+    await page.getByRole('button', { name: `Add one Juice ${marca}` }).click()
     await page.getByRole('button', { name: 'Review order' }).click()
 
     // §5.6, o caso de $189.00 que o §11 manda testar:
@@ -187,6 +216,14 @@ test.describe('link público', () => {
     await expect(conta).toContainText('$10.00')
     await expect(conta).toContainText('Extra meal ×1')
     await expect(page.getByLabel('Total')).toHaveText('$189.00')
+
+    // refeição e breakfast em blocos SEPARADOS, com a cota ao lado: juntos,
+    // um pedido sem breakfast nenhum parecia completo (relato da cliente)
+    const blocoBkf = page.locator('section').filter({ hasText: 'BREAKFASTS' })
+    await expect(blocoBkf).toContainText('5 of 5')
+    await expect(blocoBkf).toContainText(`Bkf ${marca} ×5`)
+    await expect(page.locator('section').filter({ hasText: 'MEALS' }))
+      .toContainText('11 of 10')
 
     // o adicional sem tax vem depois do delivery, com o aviso (tela 6i)
     await expect(conta).toContainText(`Juice ${marca} · no tax/delivery`)
@@ -218,18 +255,68 @@ test.describe('link público', () => {
     await expect(page.getByRole('button', { name: /Detox \/ add-ons only/ })).toHaveCount(0)
   })
 
-  test('breakfast só aparece quando o plano tem breakfast', async ({ page }) => {
+  /* Relato da cliente, 09/11/2026: breakfast no meio das refeições, e dava
+   * para seguir com o pedido incompleto. O site dela tem abas (Menu of the
+   * Week, Breakfasts & Snacks) e é esse o fluxo que ela espera. */
+  test('refeição e breakfast são ETAPAS diferentes, cada uma com sua cota',
+    async ({ page }) => {
+      await abrir(page)
+      await identificar(page, etapas1)
+      await irParaOPlano(page)
+      await page.getByRole('button', { name: 'Small', exact: true }).click()
+      await page.getByRole('button', { name: new RegExp(`^Plan ${marca}`) }).click()
+      await page.getByRole('button', { name: 'Choose your meals' }).click()
+
+      // a etapa de refeição NÃO traz breakfast — era isso que fazia a pessoa
+      // achar que já tinha escolhido os cinco
+      await expect(page.getByRole('heading', { name: 'Menu of the week' }))
+        .toBeVisible({ timeout: 20_000 })
+      await expect(page.getByRole('button', { name: `Add one Bkf ${marca}` }))
+        .toHaveCount(0)
+      await expect(page.getByLabel('meals')).toHaveText('0 of 10 meals')
+      await expect(page.getByLabel('breakfasts')).toHaveCount(0)
+
+      // e a etapa de breakfast só traz breakfast
+      for (let i = 0; i < 10; i++) await somar(page, `Dish ${marca}`).click()
+      await page.getByRole('button', { name: 'Choose your breakfasts' }).click()
+      await expect(page.getByRole('heading', { name: 'Breakfasts & snacks' }))
+        .toBeVisible({ timeout: 20_000 })
+      await expect(page.getByRole('button', { name: `Add one Dish ${marca}` }))
+        .toHaveCount(0)
+      await expect(page.getByLabel('breakfasts')).toHaveText('0 of 5 breakfasts')
+    })
+
+  /* A trava. Medido no navegador em 09/11/2026, antes do conserto: dava para
+   * seguir com `4 of 5 meals` e `0 of 5 breakfasts` e fechar o pedido — a
+   * cozinha montaria a sacola faltando cinco breakfasts que a pessoa pagou, e
+   * nada na tela dizia isso. */
+  test('etapa incompleta NÃO avança, e a tela diz o que falta', async ({ page }) => {
     await abrir(page)
-    await identificar(page)
+    await identificar(page, etapas2)
     await irParaOPlano(page)
     await page.getByRole('button', { name: 'Small', exact: true }).click()
     await page.getByRole('button', { name: new RegExp(`^Plan ${marca}`) }).click()
     await page.getByRole('button', { name: 'Choose your meals' }).click()
 
-    // o plano do fixture tem 5 breakfasts, então o prato de breakfast aparece
-    await expect(page.getByRole('button', { name: `Somar um Bkf ${marca}` }))
-      .toBeVisible({ timeout: 20_000 })
-    await expect(page.getByLabel('breakfasts')).toContainText('of 5 breakfasts')
+    const proxima = page.getByRole('button', { name: 'Choose your breakfasts' })
+    await expect(proxima).toBeDisabled({ timeout: 20_000 })
+
+    // 9 de 10: ainda falta uma, e a tela diz QUAL é a falta. Botão apagado sem
+    // explicação é o que faz a pessoa sair do pedido achando que quebrou.
+    for (let i = 0; i < 9; i++) await somar(page, `Dish ${marca}`).click()
+    await expect(proxima).toBeDisabled()
+    await expect(page.getByText(/Still to choose: 1 meals/)).toBeVisible()
+
+    await somar(page, `Dish ${marca}`).click()
+    await expect(proxima).toBeEnabled()
+    await proxima.click()
+
+    // mesma trava na etapa seguinte, com a conta dela
+    const paraAdicionais = page.getByRole('button', { name: 'See add-ons' })
+    await expect(paraAdicionais).toBeDisabled({ timeout: 20_000 })
+    await expect(page.getByText(/Still to choose: 5 breakfasts/)).toBeVisible()
+    for (let i = 0; i < 5; i++) await somar(page, `Bkf ${marca}`).click()
+    await expect(paraAdicionais).toBeEnabled()
   })
 
   test('retirar na cozinha dispensa endereço e não cobra delivery', async ({ page }) => {
@@ -248,10 +335,7 @@ test.describe('link público', () => {
     await page.getByRole('button', { name: 'Small', exact: true }).click()
     await page.getByRole('button', { name: new RegExp(`^Plan ${marca}`) }).click()
     await page.getByRole('button', { name: 'Choose your meals' }).click()
-    for (let i = 0; i < 10; i++) {
-      await page.getByRole('button', { name: `Somar um Dish ${marca}` }).click()
-    }
-    await page.getByRole('button', { name: 'See add-ons' }).click()
+    await escolherPratosDoPlano(page, marca)
     await page.getByRole('button', { name: 'Review order' }).click()
 
     // §6.6: 128.60 + tax 9.00, SEM os 10.00 de entrega

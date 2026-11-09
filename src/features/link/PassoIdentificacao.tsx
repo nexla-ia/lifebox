@@ -56,7 +56,10 @@ export function PassoIdentificacao({
   lang: Idioma
   catalogo: CatalogoLink
   dados: DadosCliente
-  setDados: (d: DadosCliente) => void
+  /** aceita atualizador: a conferência do ZIP grava DEPOIS de uma ida ao
+   *  servidor, e `{...dados}` capturado no render de antes desfaria o que a
+   *  pessoa digitou enquanto a resposta vinha */
+  setDados: (d: DadosCliente | ((p: DadosCliente) => DadosCliente)) => void
   jaTemPedido: boolean
   onAvancar: () => void
   onPedidoExistente: (p: NonNullable<Identificacao['pedidos']>) => void
@@ -71,6 +74,7 @@ export function PassoIdentificacao({
   )
   const [editandoEndereco, setEditandoEndereco] = useState(!dados.conhecido)
   const ultimoTel = useRef<string>(dados.telefone)
+  const zipConferido = useRef<string>('')
 
   /** Identifica assim que o número fica válido — a pessoa não deve ter de
    *  apertar nada para o "Olá, {nome}" aparecer (tela 6e). */
@@ -99,19 +103,24 @@ export function PassoIdentificacao({
       onPedidoExistente(data.pedidos ?? [])
 
       if (data.conhecido) {
-        setDados({
-          ...dados, telefone: e164, conhecido: true,
+        // mesmo motivo do ZIP: a identificação também volta do servidor, e a
+        // pessoa pode ter escolhido a forma de pagamento enquanto ela vinha
+        setDados((p) => ({
+          ...p, telefone: e164, conhecido: true,
           first_name: data.first_name ?? '',
           last_name: data.last_name ?? '',
           street_address: data.street_address ?? '',
           zip_code: data.zip_code ?? '',
           city: data.city ?? '',
           delivery_notes: data.delivery_notes ?? '',
-        })
+        }))
         setEditandoEndereco(false)
         if (data.zip_code) void conferirZip(data.zip_code, false)
       } else {
-        setDados({ ...CLIENTE_VAZIO, telefone: e164, fulfillment: dados.fulfillment })
+        setDados((p) => ({
+          ...CLIENTE_VAZIO, telefone: e164, fulfillment: p.fulfillment,
+          payment_method_id: p.payment_method_id,
+        }))
         setEditandoEndereco(true)
         setZip({ estado: 'vazio' })
       }
@@ -130,10 +139,47 @@ export function PassoIdentificacao({
       estado: 'atende', city: data.city ?? '', rota: data.rota ?? '',
       minimo: data.min_order_cents ?? null,
     })
-    if (gravarCidade) setDados({ ...dados, zip_code: z, city: data.city ?? '' })
+    // ATUALIZADOR, não `{...dados}`: entre digitar o ZIP e a resposta chegar
+    // passam algumas centenas de milissegundos, e nesse tempo a pessoa está
+    // digitando o endereço. Com o objeto capturado no render de antes, a
+    // resposta do ZIP devolvia o endereço ao que era — a pessoa via o que
+    // acabou de escrever desaparecer. Antes isso quase não acontecia porque a
+    // conferência só rodava ao sair do campo; agora roda durante a digitação.
+    if (gravarCidade) {
+      setDados((p) => ({ ...p, zip_code: z, city: data.city ?? '' }))
+    }
   }
 
+  /* Confere o ZIP ASSIM QUE ELE TEM 5 DÍGITOS, não só quando o campo perde o
+   * foco. Medido no navegador em 09/11/2026, com o relato da cliente:
+   *
+   *   a pessoa digita 01702, toca no botão "Escolher plano" — que está
+   *   apagado — e NADA acontece. Clicar num botão desabilitado não tira o
+   *   foco do campo, então o `onBlur` nunca dispara, a conferência nunca
+   *   roda, a cidade fica vazia e não há mensagem nenhuma na tela.
+   *
+   * Era um beco sem saída: a cliente só conseguiu seguir trocando para
+   * retirada. O `onBlur` fica, para quem sai do campo com menos de 5 dígitos.
+   *
+   * O debounce de 500ms é para não consultar a cada tecla — o `fn_link_zip`
+   * tem limite por IP, e em rede de celular o IP é compartilhado. */
+  useEffect(() => {
+    if (retira || !editandoEndereco) return
+    const z = normalizarZip(dados.zip_code)
+    if (!z) return
+    if (zip.estado === 'atende' && dados.zip_code === zipConferido.current) return
+    const timer = setTimeout(() => {
+      zipConferido.current = z
+      void conferirZip(z)
+    }, 500)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dados.zip_code, dados.fulfillment, editandoEndereco])
+
   const retira = dados.fulfillment === 'pickup'
+  // a cidade é da tabela quando o ZIP atendido trouxe uma; só aí o campo é
+  // somente-leitura
+  const cidadeDaTabela = zip.estado === 'atende' && zip.city !== ''
   // quem retira não precisa de endereço: o pedido não vai para rota nenhuma
   const enderecoOk = retira
     || (zip.estado === 'atende' && dados.street_address.trim() !== '')
@@ -142,6 +188,27 @@ export function PassoIdentificacao({
     dados.first_name.trim() !== '' &&
     enderecoOk &&
     !buscando
+
+  /** O QUE FALTA para continuar.
+   *
+   *  Sem isto o botão fica apagado e a tela não diz nada — foi assim que a
+   *  cliente travou com o ZIP 01702: endereço preenchido, cidade vazia, botão
+   *  morto e nenhuma mensagem. Ela só saiu trocando para retirada.
+   *
+   *  A lista é só do que a PESSOA pode resolver. "Conferindo" entra porque
+   *  esperar com explicação é diferente de esperar sem. */
+  const pendencias: string[] = []
+  if (!normalizarTelefone(dados.telefone)) pendencias.push(t.faltaTelefone)
+  if (dados.first_name.trim() === '') pendencias.push(t.faltaNome)
+  if (!retira) {
+    if (dados.street_address.trim() === '') pendencias.push(t.faltaEndereco)
+    if (zip.estado === 'vazio') pendencias.push(t.faltaZip)
+    else if (zip.estado === 'conferindo') pendencias.push(t.faltaZipConferir)
+    else if (zip.estado === 'fora') pendencias.push(t.faltaZipFora)
+  }
+  const listaPendencias = pendencias.length > 1
+    ? `${pendencias.slice(0, -1).join(', ')} ${t.eConj} ${pendencias[pendencias.length - 1]}`
+    : pendencias[0]
 
   return (
     <div className="flex flex-col gap-4">
@@ -236,12 +303,27 @@ export function PassoIdentificacao({
                     onBlur={(e) => void conferirZip(e.target.value)}
                     placeholder="02151" className={inputCls} />
                 </Campo>
+                {/* A cidade vem de `zip_codes` quando a tabela a tem. Quando
+                    NÃO tem, o campo fica editável em vez de travado: um ZIP
+                    cadastrado sem cidade deixava um campo vazio que não
+                    aceitava digitação, e a pessoa não tinha como seguir nem
+                    como saber por quê. */}
                 <Campo label={t.cidade}>
-                  <input value={dados.city} readOnly
-                    className={`${inputCls} bg-muted-bg text-ink-3`} />
+                  <input value={dados.city}
+                    readOnly={cidadeDaTabela}
+                    autoComplete="address-level2"
+                    onChange={(e) => setDados({ ...dados, city: e.target.value })}
+                    className={`${inputCls} ${
+                      cidadeDaTabela ? 'bg-muted-bg text-ink-3' : ''}`} />
                 </Campo>
               </div>
             </>
+          )}
+
+          {/* ZIP atendido mas sem cidade na tabela: diz para escrever, em vez
+              de deixar um campo vazio sem explicação */}
+          {!retira && editandoEndereco && zip.estado === 'atende' && zip.city === '' && (
+            <Aviso tom="info">{t.cidadeManual}</Aviso>
           )}
 
           {!retira && zip.estado === 'conferindo' && (
@@ -291,6 +373,13 @@ export function PassoIdentificacao({
             </Grupo>
           )}
         </>
+      )}
+
+      {normalizarTelefone(dados.telefone) && !podeAvancar && !buscando
+        && listaPendencias && (
+        <p className="text-[12px] text-late-text font-semibold">
+          {t.faltaPreencher} {listaPendencias}.
+        </p>
       )}
 
       <BotaoPrincipal onClick={onAvancar} disabled={!podeAvancar}>

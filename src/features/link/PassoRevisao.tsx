@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { money } from '../../lib/supabase'
 import { linkWhatsApp } from '../../lib/telefone'
-import { precificarLink, type CatalogoLink, type ItemPedido, type Preco } from './api'
+import { ERRO, precificarLink, type CatalogoLink, type ItemPedido, type Preco } from './api'
 import type { DadosCliente } from './PassoIdentificacao'
 import type { Escolha } from './PassoEscolha'
 import { dataCurta, nome, type Idioma, type Textos } from './i18n'
@@ -15,16 +15,18 @@ import { Aviso, BotaoPrincipal, Voltar } from './ui'
 
 export function PassoRevisao({
   t, lang, catalogo, dados, escolha, itens, semanaIso, entrega,
-  onEditar, onConfirmar, confirmando, erro, onVoltar,
+  onEditar, onConfirmar, confirmando, erro, onVoltar, temEtapaBreakfast,
 }: {
   t: Textos; lang: Idioma; catalogo: CatalogoLink
   dados: DadosCliente; escolha: Escolha; itens: ItemPedido[]
   semanaIso: string; entrega: string
-  onEditar: (passo: 'plano' | 'pratos' | 'adicionais') => void
+  onEditar: (passo: 'plano' | 'pratos' | 'breakfasts' | 'adicionais') => void
   onConfirmar: () => void
   confirmando: boolean
   erro: string | null
   onVoltar: () => void
+  /** o "Editar" dos breakfasts só existe quando existe a etapa */
+  temEtapaBreakfast: boolean
 }) {
   const [preco, setPreco] = useState<Preco | null>(null)
   const [erroPreco, setErroPreco] = useState<string | null>(null)
@@ -38,9 +40,15 @@ export function PassoRevisao({
     }).then(({ data, error }) => {
       if (cancelado) return
       if (error || !data) {
-        // a mensagem do banco explica o caso real ("só pode ser vendido com um
-        // plano", "sem preço para o tamanho"); genérico aqui é pior
-        setErroPreco(error?.message ?? t.erroGenerico)
+        // A mensagem do banco explica o caso real ("só pode ser vendido com um
+        // plano"), e genérico aqui seria pior. A exceção é LB424: ali a
+        // mensagem é para quem MANTÉM o sistema — "sem preco de refeicao
+        // extra para plano 65f551b5-…/tamanho 1cc41897-…" — e o cliente via
+        // isso na tela (medido no link público, 09/11/2026).
+        setErroPreco(
+          error?.code === ERRO.catalogoIncompleto
+            ? t.erroPlanoSemExtra
+            : error?.message ?? t.erroGenerico)
         return
       }
       setPreco(data)
@@ -67,8 +75,16 @@ export function PassoRevisao({
     return `${a ? nome(a, lang) : l.name_snapshot}${l.qty > 1 ? ` ×${l.qty}` : ''}`
   }
 
-  const listaPratos = itens
+  /** Refeição e breakfast em LINHAS SEPARADAS (relato da cliente,
+   *  09/11/2026). Juntas, um pedido sem breakfast nenhum parecia completo:
+   *  a lista mostrava as refeições e não havia como notar que os cinco
+   *  breakfasts do plano não tinham sido escolhidos. */
+  const listaDe = (bkf: boolean) => itens
     .filter((i): i is Extract<ItemPedido, { type: 'dish' }> => i.type === 'dish')
+    .filter((i) => {
+      const d = catalogo.dishes.find((x) => x.id === i.dish_id)
+      return d ? (d.category === 'breakfast') === bkf : false
+    })
     .map((i) => {
       const d = catalogo.dishes.find((x) => x.id === i.dish_id)
       const s = catalogo.sizes.find((x) => x.id === i.size_id)
@@ -76,6 +92,23 @@ export function PassoRevisao({
     })
     .filter(Boolean)
     .join(' · ')
+
+  const listaPratos = listaDe(false)
+  const listaBreakfasts = listaDe(true)
+
+  /** Conta o que foi escolhido, para dizer "5 de 5" ao lado do título.
+   *
+   *  Conta os ITENS, não `preco.meals_qty`: o preço chega depois, e enquanto
+   *  não chega o número do servidor é 0 — a revisão diria "0 de 5" logo acima
+   *  de uma lista com cinco pratos, e pior, acusaria "ainda falta escolher 5"
+   *  num pedido completo. Contar item é contagem, não preço: o total continua
+   *  vindo do servidor (§2). */
+  const cota = (bkf: boolean) => (bkf ? plano?.breakfasts_qty : plano?.meals_qty) ?? 0
+  const escolhidos = (bkf: boolean) => itens.reduce((n, i) => {
+    if (i.type !== 'dish') return n
+    const d = catalogo.dishes.find((x) => x.id === i.dish_id)
+    return d && (d.category === 'breakfast') === bkf ? n + i.qty : n
+  }, 0)
 
   const listaAddons = itens
     .filter((i): i is Extract<ItemPedido, { type: 'addon' }> => i.type === 'addon')
@@ -104,8 +137,32 @@ export function PassoRevisao({
       </Bloco>
 
       {listaPratos && (
-        <Bloco titulo={t.pratos} onEditar={() => onEditar('pratos')} rotuloEditar={t.editar}>
+        <Bloco titulo={t.pratos} onEditar={() => onEditar('pratos')} rotuloEditar={t.editar}
+          contagem={plano && cota(false) > 0
+            ? `${escolhidos(false)} ${t.de} ${cota(false)}` : undefined}>
           {listaPratos}
+        </Bloco>
+      )}
+
+      {/* O bloco de breakfast aparece mesmo VAZIO quando o plano tem cota:
+          é a única forma de a pessoa ver que faltam os cinco que ela pagou.
+          Antes a seção simplesmente não existia, e o pedido saía incompleto
+          sem nada na tela dizendo isso. */}
+      {temEtapaBreakfast && plano && cota(true) > 0 && (
+        <Bloco titulo={t.breakfastsTitulo} onEditar={() => onEditar('breakfasts')}
+          rotuloEditar={t.editar}
+          contagem={`${escolhidos(true)} ${t.de} ${cota(true)}`}>
+          {listaBreakfasts || (
+            <span className="text-late-text font-semibold">
+              {t.faltam} {cota(true)} {t.breakfasts}
+            </span>
+          )}
+        </Bloco>
+      )}
+      {escolha.kind === 'custom' && listaBreakfasts && (
+        <Bloco titulo={t.breakfastsTitulo} onEditar={() => onEditar('breakfasts')}
+          rotuloEditar={t.editar}>
+          {listaBreakfasts}
         </Bloco>
       )}
 
@@ -192,13 +249,23 @@ export function PassoRevisao({
 }
 
 function Bloco({
-  titulo, onEditar, rotuloEditar, children,
-}: { titulo: string; onEditar: () => void; rotuloEditar: string; children: React.ReactNode }) {
+  titulo, onEditar, rotuloEditar, children, contagem,
+}: {
+  titulo: string; onEditar: () => void; rotuloEditar: string
+  children: React.ReactNode
+  /** "4 de 5" ao lado do título: a conta que diz se o pedido está completo */
+  contagem?: string
+}) {
   return (
     <section className="bg-surface border border-line rounded-xl px-4 py-3">
       <header className="flex items-center justify-between gap-2">
         <h2 className="text-[11px] uppercase tracking-wide text-ink-muted font-semibold">
           {titulo}
+          {contagem && (
+            <span className="ml-2 text-ink-3 tnum normal-case tracking-normal">
+              {contagem}
+            </span>
+          )}
         </h2>
         <button onClick={onEditar} className="text-[11.5px] text-brand-mid hover:underline acao-toque">
           {rotuloEditar}

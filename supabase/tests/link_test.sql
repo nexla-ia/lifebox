@@ -293,6 +293,47 @@ begin
     raise notice '  ok  corta na setima tentativa do mesmo numero';
   end;
 
+  -- --------------------------- a valvula de escape tem de ABRIR (§9.7)
+  -- Medido contra o Supabase em 09/11/2026: `fn_link_limpar_tentativas` fazia
+  -- `delete from public_requests` SEM WHERE, e o pg_safeupdate do Supabase
+  -- recusa isso com 21000 "DELETE requires a WHERE clause". A funcao nunca
+  -- apagou nada em producao. E ela e a unica forma de soltar o limite quando
+  -- ele barra cliente de verdade — depois de um disparo de campanha, muita
+  -- gente abre o link da mesma rede.
+  --
+  -- ESTE TESTE NAO PEGA ESSE CASO, e o registro disso e proposital: o cluster
+  -- local nao tem a extensao, entao o DELETE sem WHERE passa aqui. Mesma
+  -- armadilha do `revoke ... from anon`. O que pega e rodar contra o Supabase.
+  -- O que o teste prende e o CONTRATO: a funcao apaga e devolve quantas.
+  raise notice 'soltar o limite apaga o controle e devolve a contagem';
+  perform fn_link_identificar('+15550100006');
+  perform assert_eq((select count(*)::int from public_requests) > 0, true,
+                    'o controle tem registro antes de limpar');
+  -- soltar o controle e admin-only (§9.7): apagar o controle inteiro sem
+  -- querer, ao tentar liberar um numero, nao pode estar ao alcance de quem
+  -- atende o balcao
+  declare v_n int; v_adm uuid := gen_random_uuid(); begin
+    begin
+      perform fn_link_limpar_tentativas();
+      raise exception 'FALHOU: anonimo soltou o controle de tentativas';
+    exception when sqlstate 'LB403' then
+      raise notice '  ok  anonimo nao solta o controle';
+    end;
+
+    insert into auth.users (id, email) values (v_adm, 'solta@teste.local');
+    update profiles set role = 'admin', status = 'ativo' where id = v_adm;
+    perform set_config('request.jwt.claim.sub', v_adm::text, true);
+
+    v_n := fn_link_limpar_tentativas();
+    perform assert_eq(v_n > 0, true, 'devolve quantas linhas soltou');
+    perform set_config('request.jwt.claim.sub', '', true);
+  end;
+  perform assert_eq((select count(*)::int from public_requests), 0,
+                    'o controle ficou vazio');
+  -- e o numero que estava barrado volta a consultar
+  perform fn_link_identificar('+15550100005');
+  raise notice '  ok  numero barrado volta a consultar';
+
   raise notice 'LINK OK';
 end $t$;
 

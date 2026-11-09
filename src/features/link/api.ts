@@ -130,6 +130,10 @@ export const ERRO = {
   zipFora: 'LB422',
   fechado: 'LB423',
   jaTemPedido: 'LB409',
+  /** o catálogo não tem o preço de que este pedido precisa (migration
+   *  20261109150000). Não é erro de quem pede, e a mensagem do banco leva
+   *  nome de função e UUID — a tela troca o texto pelo código. */
+  catalogoIncompleto: 'LB424',
   muitasTentativas: 'LB429',
 } as const
 

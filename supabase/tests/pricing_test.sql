@@ -211,5 +211,57 @@ begin
   raise notice 'CLASSIFICACAO OK';
 end $test$;
 
+-- ------------------------------- catalogo incompleto nao vira UUID na tela
+-- Medido no link publico em 09/11/2026: um plano ATIVO sem preco de refeicao
+-- extra devolvia "fn_price_order: sem preco de refeicao extra para plano
+-- 65f551b5-.../tamanho 1cc41897-..." — e a tela do link mostra a mensagem do
+-- banco ao CLIENTE de proposito, porque as mensagens de regra explicam melhor
+-- que um generico. Essa nao e de regra: e furo de cadastro, escrita para quem
+-- mantem o sistema. LB424 e o codigo que deixa a tela trocar o texto.
+do $lb424$
+declare
+  v_p uuid; v_s uuid; v_d uuid;
+begin
+  select id into v_s from sizes where code = 'S';
+  select dish_id into v_d from menu_dishes limit 1;
+
+  -- plano novo, com preco base e SEM nenhuma linha em extra_prices
+  insert into plans (name_pt, name_en, meals_qty, breakfasts_qty, active)
+    values ('Plano sem extra', 'No extra plan', 2, 0, true) returning id into v_p;
+  insert into plan_prices (plan_id, size_id, base_price_cents)
+    values (v_p, v_s, 5000);
+
+  raise notice 'plano sem preco de extra: dentro da cota, precifica normal';
+  perform assert_eq(
+    (fn_price_order('plan', v_p, v_s, null, 'pickup',
+      jsonb_build_array(jsonb_build_object(
+        'type','dish','dish_id',v_d,'size_id',v_s,'qty',2)))->>'total_cents')::int,
+    5350, 'duas refeicoes, 5000 + 7% = 5350');
+
+  raise notice 'e passar da cota levanta LB424, nao erro cru';
+  begin
+    perform fn_price_order('plan', v_p, v_s, null, 'pickup',
+      jsonb_build_array(jsonb_build_object(
+        'type','dish','dish_id',v_d,'size_id',v_s,'qty',3)));
+    raise exception 'FALHOU: cobrou extra sem preco cadastrado';
+  exception when sqlstate 'LB424' then
+    raise notice '  ok  recusa com LB424';
+  end;
+
+  raise notice 'plano sem preco NENHUM tambem e LB424';
+  declare v_q uuid; begin
+    insert into plans (name_pt, name_en, meals_qty, breakfasts_qty, active)
+      values ('Plano sem preco', 'No price plan', 2, 0, true) returning id into v_q;
+    begin
+      perform fn_price_order('plan', v_q, v_s, null, 'pickup', '[]'::jsonb);
+      raise exception 'FALHOU: precificou plano sem preco';
+    exception when sqlstate 'LB424' then
+      raise notice '  ok  recusa com LB424';
+    end;
+  end;
+
+  raise notice 'CATALOGO INCOMPLETO OK';
+end $lb424$;
+
 -- desfaz tudo: fixture, semanas, cliente e a própria assert_eq
 rollback;

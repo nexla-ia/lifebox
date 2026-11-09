@@ -113,6 +113,14 @@ pausado o DNS do projeto não resolve, o link público da cliente não responde 
 ninguém é avisado. Não é bug do sistema; é decisão de plano que precisa ser
 tomada antes de a operação depender disso.
 
+## Verificação de tipos
+
+`npm run typecheck`, **nunca `npx tsc --noEmit` solto**. O `tsconfig.json` da
+raiz é só um arquivo de referências (`files: []`), então `tsc --noEmit` sem
+`-p` não checa arquivo nenhum e sai com **código 0**: um "tsc ok" que não
+verificou nada. O script aponta para `tsconfig.app.json`, que é onde o código
+está.
+
 ## Testes de navegador
 
 `npm run e2e` (Playwright) sobe o build e checa no Chromium de verdade.
@@ -528,6 +536,32 @@ Fechado na migration 20260928160000; `link_test.sql` agora cobra a lista das
 views também, não só a das funções — foi exatamente o que faltou quando fechei
 as funções e deixei as views de fora.
 
+**Mensagem de banco na tela do cliente é escolha, e tem um limite.** O link
+mostra a mensagem do servidor de propósito — "só pode ser vendido com um plano"
+explica melhor que um genérico. Só que `fn_price_order` também levanta furo de
+CADASTRO, escrito para quem mantém o sistema: medido no endpoint público,
+um plano ativo sem preço de refeição extra devolvia ao cliente
+`fn_price_order: sem preco de refeicao extra para plano 65f551b5-…/tamanho
+1cc41897-…`. Esses casos agora têm **LB424** (migration 20261109150000) e a
+tela troca o texto pelo código. A regra geral: mensagem de REGRA vai para a
+tela; mensagem de CADASTRO ganha código e a tela escreve a frase.
+
+**A válvula de escape do rate limit estava quebrada em produção.**
+`fn_link_limpar_tentativas` fazia `delete from public_requests` **sem WHERE**, e
+o pg_safeupdate que o Supabase carrega recusa isso com `21000 DELETE requires a
+WHERE clause`. A função nunca apagou nada lá — e ela é a única forma de soltar o
+limite quando ele barra cliente de verdade, que é o caso real depois de um
+disparo de campanha. `fn_link_liberar_tentativas(chave)` não tinha o problema,
+porque já filtra.
+
+Mesma armadilha do `revoke ... from anon`: **o cluster local não tem a extensão,
+então o teste local passa e o Supabase fica quebrado.** O WHERE é sobre coluna
+(`created_at <= now()`) de propósito — `where true` é dobrado para constante e o
+pg_safeupdate recusa igual. E o helper `limparTentativas()` do e2e passou a
+GRITAR quando a chamada falha: ele engolia a resposta, e quem pagou foi um teste
+a dez posições de distância, acusando "não vejo o pedido que já existe" em vez
+de "o controle não foi limpo".
+
 Rate limit: por **telefone** curto (6 consultas/10min, 3 pedidos/30min), por
 **IP** folgado (30 e 12). Quem varre cadastro troca de número, então quem barra
 é o IP — mas apertá-lo derruba cliente de verdade, que em rede de celular
@@ -549,6 +583,35 @@ Os planos só aparecem depois do tamanho, já com o preço daquela pessoa.
 
 **Breakfast só para plano que tem breakfast**, e "Só Detox / adicionais" saiu
 das opções: Detox virou adicional dentro de um plano.
+
+**Uma CATEGORIA por etapa, e cada etapa exige a cota do plano** (relato da
+cliente, 09/11/2026). O link mostrava refeição e breakfast na mesma grade, e
+medido no navegador dava para seguir com `4 of 5 meals` e `0 of 5 breakfasts`:
+o pedido fechava faltando cinco breakfasts que a pessoa pagou, a cozinha
+montava a sacola incompleta e nada na tela dizia isso. O site da LifeBox separa
+em abas (Menu of the Week, Breakfasts & Snacks) e é esse o fluxo que ela
+espera. Passar do limite continua permitido e cobrado como extra (§5.2) — o que
+não pode é ficar ABAIXO e seguir. Desvio consciente do protótipo 6b, pedido
+pela cliente; em DECISOES-ABERTAS.
+
+A revisão lista **refeição e breakfast em blocos separados, com a cota ao
+lado**, e o bloco de breakfast aparece mesmo VAZIO quando o plano tem cota: é a
+única forma de a pessoa ver que falta o que ela pagou.
+
+**Botão apagado sem explicação é beco sem saída.** Toda etapa diz o que falta
+("Still to choose: 1 meals"), e o passo 1 lista as pendências. Foi assim que a
+cliente travou: ZIP digitado, cidade vazia, botão morto e nenhuma mensagem —
+ela só saiu trocando para retirada.
+
+**O ZIP é conferido ENQUANTO SE DIGITA, não no `onBlur`.** Clicar num botão
+desabilitado não tira o foco do campo, então o `onBlur` nunca disparava: quem
+digitava o ZIP e tocava direto no botão não via nem "não entregamos aqui" nem
+cidade nem motivo. Debounce de 500ms porque `fn_link_zip` tem limite por IP. O
+`onBlur` fica, para quem sai do campo com menos de 5 dígitos.
+
+**O campo Cidade é somente-leitura só quando a tabela a preencheu.** ZIP
+atendido sem cidade em `zip_codes` deixava um campo vazio que não aceitava
+digitação. Agora fica editável, com o aviso de escrever à mão.
 
 **Grupo de botões não vai dentro de `<label>`** (`Grupo` em `link/ui.tsx`). O
 label envolvendo botões cola o texto dela no nome acessível de CADA um —

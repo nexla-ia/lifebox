@@ -477,11 +477,20 @@ export async function liberarTentativas(chave: string) {
 export async function limparTentativas() {
   const c = await conectar()
   if (!c) return
-  await fetch(`${c.url}/rest/v1/rpc/fn_link_limpar_tentativas`, {
+  const r = await fetch(`${c.url}/rest/v1/rpc/fn_link_limpar_tentativas`, {
     method: 'POST',
     headers: { apikey: c.key, Authorization: `Bearer ${c.token}`, 'Content-Type': 'application/json' },
     body: '{}',
   })
+  // NÃO engole a falha. Esta chamada ficou quebrada em produção sem ninguém
+  // saber: `delete from public_requests` sem WHERE, que o pg_safeupdate do
+  // Supabase recusa com 21000. O helper chamava e seguia, e quem pagou foi um
+  // teste a dez posições de distância, acusando "já tem pedido" em vez de
+  // "o controle não foi limpo". Medido em 09/11/2026.
+  if (!r.ok) {
+    const txt = await r.text().catch(() => '')
+    console.error(`limparTentativas FALHOU (${r.status}): ${txt}`)
+  }
 }
 
 /** Os nomes de cliente que existem hoje no banco.
