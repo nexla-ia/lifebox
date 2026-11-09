@@ -344,12 +344,18 @@ declare
 begin
   v_w := fn_semana_atual();
   select id into v_s from sizes where code = 'S';
-  select id into v_p from plans where active and meals_qty = 5 and breakfasts_qty = 0 limit 1;
-  select md.dish_id into v_d from menu_dishes md join weeks w on w.menu_id = md.menu_id
-   where w.id = v_w limit 1;
+  select id into v_p from plans where active and meals_qty = 5 and breakfasts_qty = 0
+   order by name_pt limit 1;
+  -- prato de REFEICAO e com ORDEM (ver pricing_test)
+  select md.dish_id into v_d from menu_dishes md
+    join dishes d on d.id = md.dish_id
+    join weeks w on w.menu_id = md.menu_id
+   where w.id = v_w and d.category <> 'breakfast'
+   order by d.name_pt limit 1;
   select d.id into v_fora from dishes d
    where not exists (select 1 from menu_dishes md join weeks w on w.menu_id = md.menu_id
-                      where w.id = v_w and md.dish_id = d.id) limit 1;
+                      where w.id = v_w and md.dish_id = d.id)
+   order by d.name_pt limit 1;
 
   -- Achados em auditoria, todos pelo endpoint PUBLICO e sem login. Nenhum
   -- reduzia dinheiro; o estrago era outro — a folha da cozinha mandando fazer
@@ -408,7 +414,7 @@ begin
   begin
     perform fn_link_criar_pedido(jsonb_build_object(
       'phone','+15085550188','first_name','Hostil',
-      'zip_code',(select zip from zip_codes limit 1),'city','X',
+      'zip_code',(select zip from zip_codes where active order by zip limit 1),'city','X',
       'kind','plan','plan_id',v_p,'size_id',v_s,'fulfillment','delivery',
       'items', jsonb_build_array(jsonb_build_object('type','dish','dish_id',v_d,'qty',99999))));
     raise exception 'FALHOU: fechou pedido com quantidade absurda';
@@ -430,9 +436,14 @@ begin
 
   v_w := fn_semana_atual();
   select id into v_s from sizes where code = 'S';
-  select id into v_p from plans where active and meals_qty = 5 and breakfasts_qty = 0 limit 1;
-  select md.dish_id into v_d from menu_dishes md join weeks w on w.menu_id = md.menu_id
-   where w.id = v_w limit 1;
+  select id into v_p from plans where active and meals_qty = 5 and breakfasts_qty = 0
+   order by name_pt limit 1;
+  -- prato de REFEICAO e com ORDEM (ver pricing_test)
+  select md.dish_id into v_d from menu_dishes md
+    join dishes d on d.id = md.dish_id
+    join weeks w on w.menu_id = md.menu_id
+   where w.id = v_w and d.category <> 'breakfast'
+   order by d.name_pt limit 1;
   select zip, city into v_zip, v_cidade from zip_codes where active order by zip limit 1;
 
   -- quanto custa o pedido que vamos usar, para o minimo ser maior que ele sem

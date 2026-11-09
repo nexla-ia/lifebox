@@ -25,13 +25,48 @@ begin
   perform assert_eq(fn_codigo_semana('2026-09-21'), '2026-W39', 'codigo da semana');
 
   raise notice 'cutoff no fuso operacional';
-  -- quinta 18:00 em Nova York = 22:00 UTC no horario de verao
-  perform assert_eq(
-    fn_cutoff_da_semana('2026-09-21') at time zone 'America/New_York',
-    '2026-09-24 18:00'::timestamp, 'quinta 18h em NY');
-  perform assert_eq(
-    extract(isodow from (fn_cutoff_da_semana('2026-09-21') at time zone 'America/New_York'))::int,
-    4, 'cai numa quinta');
+  -- O QUE SE TESTA E A FORMULA, NAO O DIA. A versao antiga fixava "quinta
+  -- 18:00" no codigo, e o dia do cutoff e CADASTRO da LifeBox (§9.8,
+  -- Configuracoes > Cutoff) — nao constante do sistema. Rodando a suite contra
+  -- o Supabase da cliente, que tem sexta cadastrada, este bloco falhava sem
+  -- haver bug nenhum: "esperado 2026-09-24 18:00, veio 2026-09-25 18:00".
+  -- Teste que quebra quando a cliente usa a tela nao prova regra, prende
+  -- cadastro. Medido em 09/11/2026.
+  declare
+    v_tz   text := setting('timezone')   #>> '{}';
+    v_dia  int  := (setting('cutoff_weekday') #>> '{}')::int;
+    v_hora time := (setting('cutoff_time')    #>> '{}')::time;
+    v_loc  timestamp;
+  begin
+    v_loc := fn_cutoff_da_semana('2026-09-21') at time zone v_tz;
+    -- o cutoff cai no dia cadastrado, dentro da PROPRIA semana que comeca na
+    -- segunda 2026-09-21 — nao na anterior nem na seguinte
+    perform assert_eq(extract(isodow from v_loc)::int, v_dia,
+                      'cai no dia cadastrado (ISO ' || v_dia || ')');
+    perform assert_eq(v_loc::date, '2026-09-21'::date + (v_dia - 1),
+                      'e na semana que comeca em 2026-09-21');
+    -- e na hora cadastrada, lida no fuso da OPERACAO
+    perform assert_eq(v_loc::time, v_hora, 'na hora cadastrada, hora de la');
+
+    -- o fuso nao e deslocamento fixo: dezembro e EST (-5) e setembro EDT (-4),
+    -- e a hora LOCAL tem de continuar a mesma nos dois. Com `-04:00` escrito no
+    -- codigo o cutoff de dezembro sairia uma hora errado, e o link fecharia na
+    -- hora errada metade do ano.
+    perform assert_eq((fn_cutoff_da_semana('2026-12-14') at time zone v_tz)::time,
+                      v_hora, 'mesma hora local em dezembro (EST)');
+    -- a diferenca sai de duas leituras de PAREDE do mesmo instante, UTC menos
+    -- local: subtrair timestamptz de timestamp usaria o TimeZone da SESSAO
+    -- (aqui America/New_York), e a conta dava zero — teste que mede o ambiente
+    -- em vez da regra.
+    perform assert_eq(
+      extract(epoch from ((fn_cutoff_da_semana('2026-09-21') at time zone 'UTC')
+            - (fn_cutoff_da_semana('2026-09-21') at time zone v_tz)))::int,
+      4 * 3600, 'setembro: EDT, 4 horas para UTC');
+    perform assert_eq(
+      extract(epoch from ((fn_cutoff_da_semana('2026-12-14') at time zone 'UTC')
+            - (fn_cutoff_da_semana('2026-12-14') at time zone v_tz)))::int,
+      5 * 3600, 'dezembro: EST, 5 horas');
+  end;
 
   raise notice 'rotacao dos 4 menus';
   -- o ciclo anda de 1 em 1 e volta ao 1 depois do 4
@@ -184,11 +219,17 @@ begin
   perform set_config('request.jwt.claim.sub', v_u::text, true);
 
   select id into v_s from sizes where code = 'S';
-  select id into v_p from plans where active and meals_qty = 5 limit 1;
+  select id into v_p from plans where active and meals_qty = 5
+   order by name_pt limit 1;
   w1 := fn_ensure_week(fn_hoje_operacional() - 28);
   w2 := fn_ensure_week(fn_hoje_operacional() - 21);
+  -- prato de REFEICAO e com ORDEM (ver pricing_test): breakfast aqui mudaria
+  -- o que o pedido cobra sem o teste perceber
   select md.dish_id into v_d from menu_dishes md
-   where md.menu_id = (select menu_id from weeks where id = w1) limit 1;
+    join dishes d on d.id = md.dish_id
+   where md.menu_id = (select menu_id from weeks where id = w1)
+     and d.category <> 'breakfast'
+   order by d.name_pt limit 1;
 
   insert into customers (first_name, phone_e164, status) values
     ('Sumiu Mesmo','+15551110001','ativo'),

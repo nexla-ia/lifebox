@@ -113,6 +113,43 @@ pausado o DNS do projeto não resolve, o link público da cliente não responde 
 ninguém é avisado. Não é bug do sistema; é decisão de plano que precisa ser
 tomada antes de a operação depender disso.
 
+## Rodar a suíte SQL contra o Supabase
+
+Os dez testes ficam dentro de `begin; … rollback;`, então `db:test` com
+`DATABASE_URL` apontando para o Supabase **não grava nada** — e é uma bateria
+diferente da local, não a mesma de novo. **Nunca `db:reset` lá**: aquele apaga.
+
+O que só o Supabase pega: as extensões que o cluster local não tem
+(pg_safeupdate), o grant nominal ao `anon` que o Postgres puro não cria, e o
+**cadastro real da cliente**. O `link_test.sql` só tem dentes lá.
+
+Vale junto um teste de **divergência** — o schema do Supabase contra o
+reconstruído das migrations. Depois de aplicar migration à mão é a única forma
+de saber que o banco é o que o repositório diz: md5 de `pg_get_functiondef` de
+toda função, `relrowsecurity` de toda tabela, colunas, `security_invoker` das
+views e a lista de policies, dos dois lados, e `comm` entre eles. Em 09/11/2026
+deu 521 linhas idênticas nos dois sentidos.
+
+**Teste que quebra quando a cliente usa a tela não prova regra, prende
+cadastro.** `semanas_test.sql` fixava "quinta 18:00" no código e falhava contra
+o banco dela, que tem **sexta** cadastrada — sem haver bug nenhum. Dia e hora
+do cutoff são cadastro (§9.8); o que se testa é que o cutoff cai no dia e na
+hora CADASTRADOS, dentro da própria semana, lido no fuso da operação. O número
+sai de `setting()`, como o preço sai do seed.
+
+Do mesmo bloco: a prova de que o fuso **não** é deslocamento fixo compara duas
+leituras de parede do mesmo instante, `at time zone 'UTC'` menos `at time zone`
+o fuso da operação. Subtrair `timestamptz` de `timestamp` usa o `TimeZone` da
+SESSÃO — que aqui é America/New_York, então a conta dava **zero** e o teste
+media o ambiente em vez da regra.
+
+**`limit 1` sem `order by` é teste que passa por sorte.** `select dish_id from
+menu_dishes limit 1` devolve o que o executor varrer primeiro, e a primeira
+linha do menu de exemplo é um **breakfast**: num plano de `breakfasts_qty = 0`
+as porções viravam breakfast extra e o erro mudava de assunto. Verde por meses,
+vermelho no primeiro `db:reset`. Toda escolha de fixture leva `order by` e a
+categoria explícita.
+
 ## Verificação de tipos
 
 `npm run typecheck`, **nunca `npx tsc --noEmit` solto**. O `tsconfig.json` da

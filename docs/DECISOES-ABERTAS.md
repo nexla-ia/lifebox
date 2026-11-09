@@ -342,6 +342,13 @@ cliente podendo estar pedindo. Essa decisão é de vocês, não nossa.
 Enquanto houver diferença, quem lê o site e quem lê o link recebem prazos
 diferentes.
 
+**O sistema obedece ao que está cadastrado, e isso está provado.** Em
+09/11/2026 a bateria de testes rodou contra o banco de vocês e passou inteira
+com a **sexta** que está lá: o cutoff cai no dia e na hora cadastrados, no fuso
+de Boston, e continua 18h local no horário de verão e no de inverno. Então não
+há nada a consertar no sistema — a única coisa desencontrada é o cadastro
+contra o que o site e o documento dizem, e essa escolha é de vocês.
+
 ---
 
 ## 18. Fotos e informação dos pratos ⚠️ o que mais muda a cara do link

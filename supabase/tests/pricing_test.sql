@@ -223,7 +223,16 @@ declare
   v_p uuid; v_s uuid; v_d uuid;
 begin
   select id into v_s from sizes where code = 'S';
-  select dish_id into v_d from menu_dishes limit 1;
+  -- PRATO DE REFEICAO, escolhido com ORDEM. `menu_dishes limit 1` sem order by
+  -- devolve o que o Postgres varrer primeiro, e a primeira linha do menu de
+  -- exemplo e um BREAKFAST ("Bolo de laranja"): com breakfasts_qty = 0 as duas
+  -- porcoes viravam dois breakfasts extras e a funcao levantava "sem preco de
+  -- BREAKFAST extra", que e outro assunto. O teste passava pela ordem fisica
+  -- das linhas, e um `db:reset` a mudou. Medido em 09/11/2026.
+  select md.dish_id into v_d from menu_dishes md
+    join dishes d on d.id = md.dish_id
+   where d.category <> 'breakfast'
+   order by d.name_pt limit 1;
 
   -- plano novo, com preco base e SEM nenhuma linha em extra_prices
   insert into plans (name_pt, name_en, meals_qty, breakfasts_qty, active)

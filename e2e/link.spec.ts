@@ -27,10 +27,12 @@ const digitado = `508${marca}1`
  * estourou o teto, e quem quebrou foi o ÚLTIMO teste do arquivo — acusando
  * "não vejo o pedido que já existe", a dez posições da causa.
  *
- * Soltar o teto no `beforeEach` seria o caminho, e não funciona: a função que
- * solta está quebrada em produção (migration 20261109160000). Número próprio
- * resolve sem depender dela, e estes dois testes não fecham pedido — então não
- * criam cliente nem precisam de limpeza. */
+ * Soltar o teto a cada teste seria o caminho mais curto, e a função que solta
+ * estava quebrada em produção quando isto foi escrito — já consertada
+ * (migration 20261109160000). Mesmo assim fica o número próprio: pendurar a
+ * suíte na válvula de emergência é depender de uma rede a mais para o teste
+ * passar, e o que a chamada apaga é o controle INTEIRO, de todo mundo. Estes
+ * dois testes não fecham pedido, então não criam cliente nem pedem limpeza. */
 const etapas1 = `508${marca}3`
 const etapas2 = `508${marca}4`
 

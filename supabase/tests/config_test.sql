@@ -141,9 +141,15 @@ begin
 
   v_w := fn_semana_atual();
   select id into v_s from sizes where code = 'S';
-  select id into v_p from plans where active and meals_qty = 5 limit 1;
+  select id into v_p from plans where active and meals_qty = 5
+   order by name_pt limit 1;
+  -- prato de REFEICAO e com ORDEM: sem isso o `limit 1` pode cair num breakfast
+  -- e o pedido passa a cobrar breakfast extra, mudando o que o teste mede
   select md.dish_id into v_d from menu_dishes md
-   where md.menu_id = (select menu_id from weeks where id = v_w) limit 1;
+    join dishes d on d.id = md.dish_id
+   where md.menu_id = (select menu_id from weeks where id = v_w)
+     and d.category <> 'breakfast'
+   order by d.name_pt limit 1;
 
   insert into customers (first_name, phone_e164, status) values
     ('Aviso Um','+15559990001','ativo'), ('Aviso Dois','+15559990002','ativo'),
